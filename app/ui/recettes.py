@@ -159,6 +159,27 @@ class RecettesPage(QWidget):
         cur = conn.cursor()
 
         cur.execute("""
+            SELECT COUNT(*)
+            FROM recettes
+            WHERE plat_id = ?
+            AND stock_id = ?
+        """, (
+            self.plat.currentData(),
+            self.stock.currentData()
+        ))
+
+        existe = cur.fetchone()[0]
+
+        if existe > 0:
+            conn.close()
+
+            QMessageBox.warning(
+                self,
+                "Doublon",
+                "Cet ingrédient est déjà présent dans cette recette."
+            )
+            return
+        cur.execute("""
             INSERT INTO recettes(
                 plat_id,
                 stock_id,
