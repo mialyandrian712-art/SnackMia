@@ -179,11 +179,52 @@ class CaissePage(QWidget):
 
         self.actualiser_ticket()
 
-    def vider_ticket(self):
+    def verifier_stock(self):
 
-        self.panier.clear()
+        conn = get_connection()
+        cur = conn.cursor()
 
-        self.actualiser_ticket()
+        for nom_plat, infos in self.panier.items():
+
+            cur.execute("""
+                SELECT
+                    stock.nom,
+                    stock.quantite,
+                    recettes.quantite
+                FROM recettes
+                JOIN plats
+                    ON recettes.plat_id = plats.id
+                JOIN stock
+                    ON recettes.stock_id = stock.id
+                WHERE plats.nom = ?
+            """, (
+                nom_plat,
+            ))
+
+            ingredients = cur.fetchall()
+
+            for nom_stock, stock_disponible, quantite_recette in ingredients:
+
+                quantite_necessaire = (
+                    quantite_recette *
+                    infos["quantite"]
+                )
+
+                if stock_disponible < quantite_necessaire:
+
+                    conn.close()
+
+                    QMessageBox.warning(
+                        self,
+                        "Stock insuffisant",
+                        f"Il n'y a pas assez de '{nom_stock}' pour préparer {nom_plat}."
+                    )
+
+                    return False
+
+        conn.close()
+
+        return True
 
     def encaisser(self):
 
@@ -193,6 +234,9 @@ class CaissePage(QWidget):
                 "Ticket vide",
                 "Ajoutez au moins un produit."
             )
+            return
+        
+        if not self.verifier_stock():
             return
 
         conn = get_connection()
