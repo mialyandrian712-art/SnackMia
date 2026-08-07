@@ -17,6 +17,7 @@ from app.ui.plats import PlatsPage
 from app.ui.caisse import CaissePage
 from app.ui.ventes import VentesPage
 from app.ui.stock import StockPage
+from app.ui.recettes import RecettesPage
 
 class SnackMia(QMainWindow):
 
@@ -64,6 +65,7 @@ class SnackMia(QMainWindow):
         self.btn_plats = QPushButton("🍔 Plats")
         self.btn_caisse = QPushButton("🧾 Caisse")
         self.btn_ventes = QPushButton("📋 Ventes")
+        self.btn_recettes = QPushButton("🍳 Recettes")
         self.btn_stock = QPushButton("📦 Stock")
         self.btn_depenses = QPushButton("💰 Dépenses")
         self.btn_rapports = QPushButton("📊 Rapports")
@@ -74,6 +76,7 @@ class SnackMia(QMainWindow):
             self.btn_plats,
             self.btn_caisse,
             self.btn_ventes,
+            self.btn_recettes,
             self.btn_stock,
             self.btn_depenses,
             self.btn_rapports,
@@ -112,12 +115,14 @@ class SnackMia(QMainWindow):
         self.caisse = CaissePage()
         self.ventes = VentesPage()
         self.stock = StockPage()
+        self.recettes = RecettesPage()
 
         self.pages.addWidget(self.accueil)
         self.pages.addWidget(self.plats)
         self.pages.addWidget(self.caisse)
         self.pages.addWidget(self.ventes)
         self.pages.addWidget(self.stock)
+        self.pages.addWidget(self.recettes)
 
         principal.addWidget(self.pages)
 
@@ -135,4 +140,15 @@ class SnackMia(QMainWindow):
         )
         self.btn_stock.clicked.connect(
             lambda: self.pages.setCurrentWidget(self.stock)
+        )
+        self.btn_recettes.clicked.connect(
+            self.ouvrir_recettes
+        )
+
+    def ouvrir_recettes(self):
+
+        self.recettes.actualiser()
+
+        self.pages.setCurrentWidget(
+            self.recettes
         )

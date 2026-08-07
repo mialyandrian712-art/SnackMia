@@ -56,6 +56,17 @@ def create_database():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS recettes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plat_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        quantite REAL NOT NULL,
+        FOREIGN KEY (plat_id) REFERENCES plats(id),
+        FOREIGN KEY (stock_id) REFERENCES stock(id)
+    )
+    """)
+
     conn.commit()
     conn.close()
 
