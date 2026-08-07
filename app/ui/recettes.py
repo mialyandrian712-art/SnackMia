@@ -19,6 +19,7 @@ class RecettesPage(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.recette_selectionnee = None
 
         layout = QVBoxLayout()
 
@@ -80,8 +81,28 @@ class RecettesPage(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch
         )
+        self.table.cellClicked.connect(
+            self.selectionner_recette
+        )
 
         layout.addWidget(self.table)
+        boutons = QHBoxLayout()
+
+        self.btn_modifier = QPushButton("✏ Modifier")
+        self.btn_supprimer = QPushButton("🗑 Supprimer")
+
+        boutons.addWidget(self.btn_modifier)
+        boutons.addWidget(self.btn_supprimer)
+
+        layout.addLayout(boutons)
+
+        self.btn_modifier.clicked.connect(
+            self.modifier_recette
+        )
+
+        self.btn_supprimer.clicked.connect(
+            self.supprimer_recette
+        )
 
         self.setLayout(layout)
 
@@ -212,6 +233,7 @@ class RecettesPage(QWidget):
 
         cur.execute("""
             SELECT
+                recettes.id,
                 stock.nom,
                 recettes.quantite
             FROM recettes
@@ -235,12 +257,26 @@ class RecettesPage(QWidget):
         self.table.setRowCount(len(recettes))
 
         for ligne, recette in enumerate(recettes):
-            for colonne, valeur in enumerate(recette):
-                self.table.setItem(
-                    ligne,
-                    colonne,
-                    QTableWidgetItem(str(valeur))
-                )
+
+            # recette = (id, nom, quantité)
+
+            self.table.setItem(
+                ligne,
+                0,
+                QTableWidgetItem(recette[1])
+            )
+
+            self.table.setItem(
+                ligne,
+                1,
+                QTableWidgetItem(str(recette[2]))
+            )
+
+            # On cache l'id dans la première cellule
+            self.table.item(ligne, 0).setData(
+                1000,
+                recette[0]
+            )
 
         conn.close()
 
@@ -249,3 +285,94 @@ class RecettesPage(QWidget):
         self.charger_plats()
         self.charger_stock()
         self.charger_recettes()
+
+    def selectionner_recette(self, ligne, colonne):
+
+        self.recette_selectionnee = self.table.item(
+            ligne,
+            0
+        ).data(1000)
+
+        self.stock.setCurrentText(
+            self.table.item(ligne, 0).text()
+        )
+
+        self.quantite.setText(
+            self.table.item(ligne, 1).text()
+        )
+
+    def modifier_recette(self):
+
+        if self.recette_selectionnee is None:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Sélectionne une recette."
+            )
+            return
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE recettes
+            SET stock_id = ?, quantite = ?
+            WHERE id = ?
+        """, (
+            self.stock.currentData(),
+            float(self.quantite.text()),
+            self.recette_selectionnee
+        ))
+
+        conn.commit()
+        conn.close()
+
+        self.charger_recettes()
+
+        QMessageBox.information(
+            self,
+            "Succès",
+            "Recette modifiée."
+        )
+
+    def supprimer_recette(self):
+
+        if self.recette_selectionnee is None:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Sélectionne une recette."
+            )
+            return
+
+        reponse = QMessageBox.question(
+            self,
+            "Confirmation",
+            "Supprimer cet ingrédient de la recette ?"
+        )
+
+        if reponse != QMessageBox.Yes:
+            return
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute(
+            "DELETE FROM recettes WHERE id=?",
+            (self.recette_selectionnee,)
+        )
+
+        conn.commit()
+        conn.close()
+
+        self.recette_selectionnee = None
+
+        self.quantite.clear()
+
+        self.charger_recettes()
+
+        QMessageBox.information(
+            self,
+            "Succès",
+            "Ingrédient supprimé."
+        )
