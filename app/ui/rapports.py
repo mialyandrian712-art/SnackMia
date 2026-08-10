@@ -4,7 +4,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QFrame
+    QFrame,
+    QComboBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView 
 )
 
 from PySide6.QtCore import Qt
@@ -35,6 +39,30 @@ class RapportsPage(QWidget):
         layout.addWidget(titre)
 
         # ==========================
+        # Sélection de la période
+        # ==========================
+
+        periode_layout = QHBoxLayout()
+
+        periode_label = QLabel("Période :")
+
+        self.periode = QComboBox()
+
+        self.periode.addItems([
+            "Aujourd'hui",
+            "Hier",
+            "Cette semaine",
+            "Ce mois",
+            "Cette année"
+        ])
+
+        periode_layout.addWidget(periode_label)
+        periode_layout.addWidget(self.periode)
+        periode_layout.addStretch()
+
+        layout.addLayout(periode_layout)
+
+        # ==========================
         # Cartes
         # ==========================
 
@@ -55,11 +83,95 @@ class RapportsPage(QWidget):
             "0 Ar"
         )
 
+        self.nombre_ventes = self.creer_carte(
+            "🧾 Nombre de ventes",
+            "0"
+        )
+
+        self.panier_moyen = self.creer_carte(
+            "🛒 Panier moyen",
+            "0 Ar"
+        )
+
         cartes.addWidget(self.ca)
         cartes.addWidget(self.depenses)
         cartes.addWidget(self.resultat)
+        cartes.addWidget(self.nombre_ventes)
+        cartes.addWidget(self.panier_moyen)
 
         layout.addLayout(cartes)
+
+        # ==========================
+        # Plats les plus vendus
+        # ==========================
+
+        titre_plats = QLabel(
+            "🍔 Plats les plus vendus"
+        )
+
+        titre_plats.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(titre_plats)
+
+        self.table_plats = QTableWidget()
+
+        self.table_plats.setColumnCount(2)
+
+        self.table_plats.setHorizontalHeaderLabels([
+            "Plat",
+            "Quantité vendue"
+        ])
+
+        self.table_plats.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_plats.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
+
+        layout.addWidget(self.table_plats)
+
+        # ==========================
+        # Alertes stock
+        # ==========================
+
+        titre_stock = QLabel(
+            "📦 État du stock"
+        )
+
+        titre_stock.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(titre_stock)
+
+        self.table_stock = QTableWidget()
+
+        self.table_stock.setColumnCount(4)
+
+        self.table_stock.setHorizontalHeaderLabels([
+            "Produit",
+            "Quantité",
+            "Unité",
+            "Seuil"
+        ])
+
+        self.table_stock.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_stock.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
+
+        layout.addWidget(self.table_stock)
 
         # ==========================
         # Bouton actualiser
@@ -82,6 +194,10 @@ class RapportsPage(QWidget):
         # ==========================
 
         self.btn_actualiser.clicked.connect(
+            self.actualiser
+        )
+
+        self.periode.currentIndexChanged.connect(
             self.actualiser
         )
 
@@ -153,38 +269,118 @@ class RapportsPage(QWidget):
         cur = conn.cursor()
 
         # ==========================
-        # Chiffre d'affaires du jour
+        # Déterminer la période
         # ==========================
 
-        cur.execute("""
+        periode = self.periode.currentText()
+
+        if periode == "Aujourd'hui":
+
+            condition = """
+                date(date_vente) = date('now')
+            """
+
+            condition_depenses = """
+                date(date_depense) = date('now')
+            """
+
+        elif periode == "Hier":
+
+            condition = """
+                date(date_vente) = date('now', '-1 day')
+            """
+
+            condition_depenses = """
+                date(date_depense) = date('now', '-1 day')
+            """
+
+        elif periode == "Cette semaine":
+
+            condition = """
+                date(date_vente)
+                >= date('now', 'weekday 0', '-6 days')
+            """
+
+            condition_depenses = """
+                date(date_depense)
+                >= date('now', 'weekday 0', '-6 days')
+            """
+
+        elif periode == "Ce mois":
+
+            condition = """
+                strftime('%Y-%m', date_vente)
+                = strftime('%Y-%m', 'now')
+            """
+
+            condition_depenses = """
+                strftime('%Y-%m', date_depense)
+                = strftime('%Y-%m', 'now')
+            """
+
+        elif periode == "Cette année":
+
+            condition = """
+                strftime('%Y', date_vente)
+                = strftime('%Y', 'now')
+            """
+
+            condition_depenses = """
+                strftime('%Y', date_depense)
+                = strftime('%Y', 'now')
+            """
+
+        else:
+
+            condition = """
+                date(date_vente) = date('now')
+            """
+
+            condition_depenses = """
+                date(date_depense) = date('now')
+            """
+
+        # ==========================
+        # Chiffre d'affaires
+        # ==========================
+
+        cur.execute(f"""
             SELECT COALESCE(
                 SUM(total),
                 0
             )
             FROM ventes
-            WHERE date(date_vente)
-                  = date('now')
+            WHERE {condition}
         """)
 
         chiffre_affaires = cur.fetchone()[0]
 
         # ==========================
-        # Dépenses du jour
+        # Dépenses
         # ==========================
 
-        cur.execute("""
+        cur.execute(f"""
             SELECT COALESCE(
                 SUM(montant),
                 0
             )
             FROM depenses
-            WHERE date(date_depense)
-                  = date('now')
+            WHERE {condition_depenses}
         """)
 
         total_depenses = cur.fetchone()[0]
 
-        conn.close()
+        # ==========================
+        # Nombre de ventes
+        # ==========================
+
+        cur.execute(f"""
+            SELECT COUNT(*)
+            FROM ventes
+            WHERE {condition}
+        """)
+
+        nombre_ventes = cur.fetchone()[0]
 
         # ==========================
         # Résultat
@@ -194,6 +390,55 @@ class RapportsPage(QWidget):
             chiffre_affaires
             - total_depenses
         )
+
+        # ==========================
+        # Panier moyen
+        # ==========================
+
+        if nombre_ventes > 0:
+
+            panier_moyen = (
+                chiffre_affaires
+                / nombre_ventes
+            )
+
+        else:
+
+            panier_moyen = 0
+
+        # ==========================
+        # Plats les plus vendus
+        # ==========================
+
+        cur.execute(f"""
+            SELECT
+                details_vente.plat,
+                SUM(details_vente.quantite) AS quantite_totale
+            FROM details_vente
+            JOIN ventes
+                ON details_vente.vente_id = ventes.id
+            WHERE {condition}
+            GROUP BY details_vente.plat
+            ORDER BY quantite_totale DESC
+        """)
+
+        plats_vendus = cur.fetchall()
+
+        # ==========================
+        # État du stock
+        # ==========================
+
+        cur.execute("""
+            SELECT
+                nom,
+                quantite,
+                unite,
+                seuil
+            FROM stock
+            ORDER BY quantite ASC
+        """)
+
+        stock = cur.fetchall()   
 
         # ==========================
         # Affichage
@@ -210,3 +455,88 @@ class RapportsPage(QWidget):
         self.resultat.valeur.setText(
             f"{resultat:,.0f} Ar"
         )
+
+        self.nombre_ventes.valeur.setText(
+            str(nombre_ventes)
+        )
+
+        self.panier_moyen.valeur.setText(
+            f"{panier_moyen:,.0f} Ar"
+        )
+
+        # ==========================
+        # Affichage des plats vendus
+        # ==========================
+
+        self.table_plats.setRowCount(
+            len(plats_vendus)
+        )
+
+        for ligne, plat in enumerate(plats_vendus):
+
+            self.table_plats.setItem(
+                ligne,
+                0,
+                QTableWidgetItem(
+                    str(plat[0])
+                )
+            )
+
+            self.table_plats.setItem(
+                ligne,
+                1,
+                QTableWidgetItem(
+                    str(plat[1])
+                )
+            )
+
+        # ==========================
+        # Affichage du stock
+        # ==========================
+
+        self.table_stock.setRowCount(
+            len(stock)
+        )
+
+        for ligne, produit in enumerate(stock):
+
+            nom, quantite, unite, seuil = produit
+
+            valeurs = [
+                nom,
+                quantite,
+                unite,
+                seuil
+            ]
+
+            for colonne, valeur in enumerate(valeurs):
+
+                item = QTableWidgetItem(
+                    str(valeur)
+                )
+
+                self.table_stock.setItem(
+                    ligne,
+                    colonne,
+                    item
+                )
+
+            # ==========================
+            # Alerte stock faible
+            # ==========================
+
+            if quantite <= seuil:
+
+                for colonne in range(4):
+
+                    item = self.table_stock.item(
+                        ligne,
+                        colonne
+                    )
+
+                    if item:
+                        item.setText(
+                            "⚠️ " + item.text()
+                        )
+
+        conn.close()
