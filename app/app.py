@@ -19,6 +19,7 @@ from app.ui.ventes import VentesPage
 from app.ui.stock import StockPage
 from app.ui.recettes import RecettesPage
 from app.ui.depenses import DepensesPage
+from app.ui.rapports import RapportsPage
 
 class SnackMia(QMainWindow):
 
@@ -118,6 +119,7 @@ class SnackMia(QMainWindow):
         self.stock = StockPage()
         self.recettes = RecettesPage()
         self.depenses = DepensesPage()
+        self.rapports = RapportsPage()
 
         self.caisse.vente_enregistree.connect(
             self.actualiser_apres_vente
@@ -130,6 +132,7 @@ class SnackMia(QMainWindow):
         self.pages.addWidget(self.stock)
         self.pages.addWidget(self.recettes)
         self.pages.addWidget(self.depenses)
+        self.pages.addWidget(self.rapports)
 
         principal.addWidget(self.pages)
 
@@ -154,6 +157,9 @@ class SnackMia(QMainWindow):
         self.btn_depenses.clicked.connect(
             self.ouvrir_depenses
         )
+        self.btn_rapports.clicked.connect(
+            self.ouvrir_rapports
+        )
 
     def actualiser_apres_vente(self):
 
@@ -167,7 +173,15 @@ class SnackMia(QMainWindow):
 
         self.pages.setCurrentWidget(
             self.depenses
-        )    
+        )   
+
+    def ouvrir_rapports(self):
+
+        self.rapports.actualiser()
+
+        self.pages.setCurrentWidget(
+            self.rapports
+        )     
     
     def ouvrir_recettes(self):
 
