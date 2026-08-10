@@ -67,6 +67,16 @@ def create_database():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS depenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date_depense TEXT NOT NULL,
+        libelle TEXT NOT NULL,
+        categorie TEXT NOT NULL,
+        montant REAL NOT NULL
+    )
+    """)
+
     conn.commit()
     conn.close()
 
