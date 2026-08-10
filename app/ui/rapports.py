@@ -174,6 +174,44 @@ class RapportsPage(QWidget):
         layout.addWidget(self.table_stock)
 
         # ==========================
+        # Historique des ventes
+        # ==========================
+
+        titre_historique = QLabel(
+            "📜 Historique des ventes"
+        )
+
+        titre_historique.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(titre_historique)
+
+        self.table_historique = QTableWidget()
+
+        self.table_historique.setColumnCount(5)
+
+        self.table_historique.setHorizontalHeaderLabels([
+            "Date",
+            "Plat",
+            "Quantité",
+            "Prix",
+            "Total"
+        ])
+
+        self.table_historique.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_historique.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
+
+        layout.addWidget(self.table_historique)
+
+        # ==========================
         # Bouton actualiser
         # ==========================
 
@@ -425,6 +463,26 @@ class RapportsPage(QWidget):
         plats_vendus = cur.fetchall()
 
         # ==========================
+        # Historique des ventes
+        # ==========================
+
+        cur.execute(f"""
+            SELECT
+                ventes.date_vente,
+                details_vente.plat,
+                details_vente.quantite,
+                details_vente.prix,
+                details_vente.quantite * details_vente.prix
+            FROM details_vente
+            JOIN ventes
+                ON details_vente.vente_id = ventes.id
+            WHERE {condition}
+            ORDER BY ventes.date_vente DESC
+        """)
+
+        historique = cur.fetchall()
+
+        # ==========================
         # État du stock
         # ==========================
 
@@ -539,4 +597,24 @@ class RapportsPage(QWidget):
                             "⚠️ " + item.text()
                         )
 
+        # ==========================
+        # Affichage de l'historique
+        # ==========================
+
+        self.table_historique.setRowCount(
+            len(historique)
+        )
+
+        for ligne, vente in enumerate(historique):
+
+            for colonne, valeur in enumerate(vente):
+
+                self.table_historique.setItem(
+                    ligne,
+                    colonne,
+                    QTableWidgetItem(
+                        str(valeur)
+                    )
+                )
+    
         conn.close()
