@@ -226,6 +226,49 @@ class CaissePage(QWidget):
 
         return True
 
+    def destocker(self, cur):
+
+        for nom_plat, infos in self.panier.items():
+
+            cur.execute("""
+                SELECT
+                    recettes.stock_id,
+                    recettes.quantite
+                FROM recettes
+                JOIN plats
+                    ON recettes.plat_id = plats.id
+                WHERE plats.nom = ?
+            """, (
+                nom_plat,
+            ))
+
+            ingredients = cur.fetchall()
+
+            print("INGRÉDIENTS À DÉSTOCKER :", ingredients)
+
+            for stock_id, quantite_recette in ingredients:
+
+                quantite_necessaire = (
+                    quantite_recette *
+                    infos["quantite"]
+                )
+
+                cur.execute("""
+                    UPDATE stock
+                    SET quantite = quantite - ?
+                    WHERE id = ?
+                """, (
+                    quantite_necessaire,
+                    stock_id
+                ))
+
+                print(
+                    "DÉSTOCKAGE :",
+                    nom_plat,
+                    stock_id,
+                    quantite_necessaire
+                )
+    
     def encaisser(self):
 
         if not self.panier:
@@ -241,6 +284,8 @@ class CaissePage(QWidget):
 
         conn = get_connection()
         cur = conn.cursor()
+
+        self.destocker(cur)
 
         total = 0
 

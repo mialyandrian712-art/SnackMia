@@ -136,10 +136,10 @@ class SnackMia(QMainWindow):
             lambda: self.pages.setCurrentWidget(self.caisse)
         )
         self.btn_ventes.clicked.connect(
-            lambda: self.pages.setCurrentWidget(self.ventes)
+            self.ouvrir_ventes
         )
         self.btn_stock.clicked.connect(
-            lambda: self.pages.setCurrentWidget(self.stock)
+            self.ouvrir_stock
         )
         self.btn_recettes.clicked.connect(
             self.ouvrir_recettes
@@ -152,3 +152,19 @@ class SnackMia(QMainWindow):
         self.pages.setCurrentWidget(
             self.recettes
         )
+
+    def ouvrir_stock(self):
+
+        self.stock.charger_stock()
+
+        self.pages.setCurrentWidget(
+            self.stock
+        )    
+
+    def ouvrir_ventes(self):
+
+        self.ventes.charger_ventes()
+
+        self.pages.setCurrentWidget(
+            self.ventes
+        )    
