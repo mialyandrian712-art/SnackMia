@@ -117,6 +117,10 @@ class SnackMia(QMainWindow):
         self.stock = StockPage()
         self.recettes = RecettesPage()
 
+        self.caisse.vente_enregistree.connect(
+            self.actualiser_apres_vente
+        )
+
         self.pages.addWidget(self.accueil)
         self.pages.addWidget(self.plats)
         self.pages.addWidget(self.caisse)
@@ -145,6 +149,12 @@ class SnackMia(QMainWindow):
             self.ouvrir_recettes
         )
 
+    def actualiser_apres_vente(self):
+
+        self.stock.charger_stock()
+        self.ventes.charger_ventes()
+        self.recettes.actualiser()
+    
     def ouvrir_recettes(self):
 
         self.recettes.actualiser()

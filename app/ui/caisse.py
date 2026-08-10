@@ -8,10 +8,13 @@ from PySide6.QtWidgets import (
     QFrame,
     QMessageBox
 )
+from PySide6.QtCore import Signal
+
 from app.database.database import get_connection
 
-
 class CaissePage(QWidget):
+
+    vente_enregistree = Signal()
 
     def __init__(self):
         super().__init__()
@@ -349,5 +352,7 @@ class CaissePage(QWidget):
             "Succès",
             "Vente enregistrée avec succès."
         )
+
+        self.vente_enregistree.emit()
 
         self.vider_ticket()
