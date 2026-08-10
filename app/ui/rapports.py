@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
     QComboBox,
+    QLineEdit,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView 
@@ -189,6 +191,20 @@ class RapportsPage(QWidget):
 
         layout.addWidget(titre_historique)
 
+        # ==========================
+        # Recherche dans l'historique
+        # ==========================
+
+        self.recherche = QLineEdit()
+
+        self.recherche.setPlaceholderText(
+            "🔎 Rechercher un plat..."
+        )
+
+        layout.addWidget(
+            self.recherche
+        )
+
         self.table_historique = QTableWidget()
 
         self.table_historique.setColumnCount(5)
@@ -212,6 +228,43 @@ class RapportsPage(QWidget):
         layout.addWidget(self.table_historique)
 
         # ==========================
+        # Historique des dépenses
+        # ==========================
+
+        titre_depenses = QLabel(
+            "💸 Historique des dépenses"
+        )
+
+        titre_depenses.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(titre_depenses)
+
+        self.table_depenses = QTableWidget()
+
+        self.table_depenses.setColumnCount(4)
+
+        self.table_depenses.setHorizontalHeaderLabels([
+            "Date",
+            "Libellé",
+            "Catégorie",
+            "Montant"
+        ])
+
+        self.table_depenses.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_depenses.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
+
+        layout.addWidget(self.table_depenses)
+
+        # ==========================
         # Bouton actualiser
         # ==========================
 
@@ -225,6 +278,105 @@ class RapportsPage(QWidget):
             self.btn_actualiser
         )
 
+        layout.removeWidget(titre_plats)
+        layout.removeWidget(self.table_plats)
+
+        layout.removeWidget(titre_stock)
+        layout.removeWidget(self.table_stock)
+
+        layout.removeWidget(titre_historique)
+        layout.removeWidget(self.recherche)
+        layout.removeWidget(self.table_historique)
+
+        layout.removeWidget(titre_depenses)
+        layout.removeWidget(self.table_depenses)
+
+        # ==========================
+        # Organisation en onglets
+        # ==========================
+
+        onglets = QTabWidget()
+
+        # --------------------------
+        # Onglet Produits
+        # --------------------------
+
+        page_produits = QWidget()
+        layout_produits = QVBoxLayout()
+
+        layout_produits.addWidget(titre_plats)
+        layout_produits.addWidget(self.table_plats)
+
+        page_produits.setLayout(
+            layout_produits
+        )
+
+        onglets.addTab(
+            page_produits,
+            "🍔 Produits"
+        )
+
+        # --------------------------
+        # Onglet Stock
+        # --------------------------
+
+        page_stock = QWidget()
+        layout_stock = QVBoxLayout()
+
+        layout_stock.addWidget(titre_stock)
+        layout_stock.addWidget(self.table_stock)
+
+        page_stock.setLayout(
+            layout_stock
+        )
+
+        onglets.addTab(
+            page_stock,
+            "📦 Stock"
+        )
+
+        # --------------------------
+        # Onglet Historique
+        # --------------------------
+
+        page_historique = QWidget()
+        layout_historique = QVBoxLayout()
+
+        layout_historique.addWidget(
+            titre_historique
+        )
+
+        layout_historique.addWidget(
+            self.recherche
+        )
+
+        layout_historique.addWidget(
+            self.table_historique
+        )
+
+        layout_historique.addWidget(
+            titre_depenses
+        )
+
+        layout_historique.addWidget(
+            self.table_depenses
+        )
+
+        page_historique.setLayout(
+            layout_historique
+        )
+
+        onglets.addTab(
+            page_historique,
+            "📜 Historique"
+        )
+
+        # --------------------------
+        # Ajouter les onglets
+        # --------------------------
+
+        layout.addWidget(onglets)
+
         self.setLayout(layout)
 
         # ==========================
@@ -236,6 +388,10 @@ class RapportsPage(QWidget):
         )
 
         self.periode.currentIndexChanged.connect(
+            self.actualiser
+        )
+
+        self.recherche.textChanged.connect(
             self.actualiser
         )
 
@@ -466,21 +622,100 @@ class RapportsPage(QWidget):
         # Historique des ventes
         # ==========================
 
-        cur.execute(f"""
-            SELECT
-                ventes.date_vente,
-                details_vente.plat,
-                details_vente.quantite,
-                details_vente.prix,
-                details_vente.quantite * details_vente.prix
-            FROM details_vente
-            JOIN ventes
-                ON details_vente.vente_id = ventes.id
-            WHERE {condition}
-            ORDER BY ventes.date_vente DESC
-        """)
+        recherche = self.recherche.text().strip()
+
+        if recherche:
+
+            cur.execute(f"""
+                SELECT
+                    ventes.date_vente,
+                    details_vente.plat,
+                    details_vente.quantite,
+                    details_vente.prix,
+                    details_vente.quantite * details_vente.prix
+                FROM details_vente
+                JOIN ventes
+                    ON details_vente.vente_id = ventes.id
+                WHERE {condition}
+                AND details_vente.plat LIKE ?
+                ORDER BY ventes.date_vente DESC
+            """, (
+                f"%{recherche}%",
+            ))
+
+        else:
+
+            cur.execute(f"""
+                SELECT
+                    ventes.date_vente,
+                    details_vente.plat,
+                    details_vente.quantite,
+                    details_vente.prix,
+                    details_vente.quantite * details_vente.prix
+                FROM details_vente
+                JOIN ventes
+                    ON details_vente.vente_id = ventes.id
+                WHERE {condition}
+                ORDER BY ventes.date_vente DESC
+            """)
 
         historique = cur.fetchall()
+
+        # ==========================
+        # Historique des dépenses
+        # ==========================
+
+        if periode == "Aujourd'hui":
+
+            condition_depenses = """
+                date(date_depense) = date('now')
+            """
+
+        elif periode == "Hier":
+
+            condition_depenses = """
+                date(date_depense) = date('now', '-1 day')
+            """
+
+        elif periode == "Cette semaine":
+
+            condition_depenses = """
+                date(date_depense)
+                >= date('now', 'weekday 0', '-6 days')
+            """
+
+        elif periode == "Ce mois":
+
+            condition_depenses = """
+                strftime('%Y-%m', date_depense)
+                = strftime('%Y-%m', 'now')
+            """
+
+        elif periode == "Cette année":
+
+            condition_depenses = """
+                strftime('%Y', date_depense)
+                = strftime('%Y', 'now')
+            """
+
+        else:
+
+            condition_depenses = """
+                date(date_depense) = date('now')
+            """
+
+        cur.execute(f"""
+            SELECT
+                date_depense,
+                libelle,
+                categorie,
+                montant
+            FROM depenses
+            WHERE {condition_depenses}
+            ORDER BY date_depense DESC
+        """)
+
+        historique_depenses = cur.fetchall()
 
         # ==========================
         # État du stock
@@ -616,5 +851,29 @@ class RapportsPage(QWidget):
                         str(valeur)
                     )
                 )
+
+        # ==========================
+        # Affichage des dépenses
+        # ==========================
+
+        self.table_depenses.setRowCount(
+            len(historique_depenses)
+        )
+
+        for ligne, depense in enumerate(
+            historique_depenses
+        ):
+
+            for colonne, valeur in enumerate(
+                depense
+            ):
+
+                self.table_depenses.setItem(
+                    ligne,
+                    colonne,
+                    QTableWidgetItem(
+                        str(valeur)
+                    )
+                )        
     
         conn.close()
