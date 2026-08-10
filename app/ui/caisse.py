@@ -244,8 +244,6 @@ class CaissePage(QWidget):
 
             ingredients = cur.fetchall()
 
-            print("INGRÉDIENTS À DÉSTOCKER :", ingredients)
-
             for stock_id, quantite_recette in ingredients:
 
                 quantite_necessaire = (
@@ -261,13 +259,6 @@ class CaissePage(QWidget):
                     quantite_necessaire,
                     stock_id
                 ))
-
-                print(
-                    "DÉSTOCKAGE :",
-                    nom_plat,
-                    stock_id,
-                    quantite_necessaire
-                )
     
     def encaisser(self):
 
@@ -278,48 +269,79 @@ class CaissePage(QWidget):
                 "Ajoutez au moins un produit."
             )
             return
-        
+
+        # Vérifier le stock avant toute modification
         if not self.verifier_stock():
             return
 
         conn = get_connection()
         cur = conn.cursor()
 
-        self.destocker(cur)
+        try:
 
-        total = 0
+            # Calcul du total
+            total = 0
 
-        for infos in self.panier.values():
-            total += infos["prix"] * infos["quantite"]
+            for infos in self.panier.values():
+                total += infos["prix"] * infos["quantite"]
 
-        cur.execute("""
-            INSERT INTO ventes(date_vente, total, mode_paiement)
-            VALUES(datetime('now'), ?, ?)
-        """, (
-            total,
-            "Espèces"
-        ))
+            # Déstockage
+            self.destocker(cur)
 
-        vente_id = cur.lastrowid
-
-        for nom, infos in self.panier.items():
-
+            # Enregistrement de la vente
             cur.execute("""
-                INSERT INTO details_vente(
-                    vente_id,
-                    plat,
-                    quantite,
-                    prix
+                INSERT INTO ventes(
+                    date_vente,
+                    total,
+                    mode_paiement
                 )
-                VALUES(?,?,?,?)
+                VALUES(
+                    datetime('now'),
+                    ?,
+                    ?
+                )
             """, (
-                vente_id,
-                nom,
-                infos["quantite"],
-                infos["prix"]
+                total,
+                "Espèces"
             ))
 
-        conn.commit()
+            vente_id = cur.lastrowid
+
+            # Enregistrement des détails
+            for nom, infos in self.panier.items():
+
+                cur.execute("""
+                    INSERT INTO details_vente(
+                        vente_id,
+                        plat,
+                        quantite,
+                        prix
+                    )
+                    VALUES(?,?,?,?)
+                """, (
+                    vente_id,
+                    nom,
+                    infos["quantite"],
+                    infos["prix"]
+                ))
+
+            # Tout s'est bien passé
+            conn.commit()
+
+        except Exception as e:
+
+            # Annuler toutes les modifications
+            conn.rollback()
+
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"La vente n'a pas pu être enregistrée.\n\n{e}"
+            )
+
+            conn.close()
+            return
+
         conn.close()
 
         QMessageBox.information(
