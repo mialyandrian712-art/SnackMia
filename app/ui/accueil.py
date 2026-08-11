@@ -69,15 +69,44 @@ class AccueilPage(QWidget):
 
         grille = QGridLayout()
 
-        self.ca = Carte("💰 Chiffre d'affaires", "0 Ar")
-        self.plats = Carte("🍔 Plats", "0")
-        self.stock = Carte("📦 Stock", "0")
-        self.alertes = Carte("⚠ Alertes", "0")
+        self.ca = Carte(
+            "💰 Chiffre d'affaires",
+            "0 Ar"
+        )
 
-        grille.addWidget(self.ca,0,0)
-        grille.addWidget(self.plats,0,1)
-        grille.addWidget(self.stock,1,0)
-        grille.addWidget(self.alertes,1,1)
+        self.resultat = Carte(
+            "📈 Résultat du jour",
+            "0 Ar"
+        )
+
+        self.ventes = Carte(
+            "🧾 Ventes aujourd'hui",
+            "0"
+        )
+
+        self.plats = Carte(
+            "🍔 Plats",
+            "0"
+        )
+
+        self.stock = Carte(
+            "📦 Stock",
+            "0"
+        )
+
+        self.alertes = Carte(
+            "⚠️ Alertes",
+            "0"
+        )
+
+        grille.addWidget(self.ca, 0, 0)
+        grille.addWidget(self.resultat, 0, 1)
+
+        grille.addWidget(self.ventes, 1, 0)
+        grille.addWidget(self.plats, 1, 1)
+
+        grille.addWidget(self.stock, 2, 0)
+        grille.addWidget(self.alertes, 2, 1)
 
         layout.addLayout(grille)
 
@@ -127,6 +156,38 @@ class AccueilPage(QWidget):
         chiffre_affaires = cur.fetchone()[0]
 
         # ==========================
+        # Résultat du jour
+        # ==========================
+
+        cur.execute("""
+            SELECT COALESCE(
+                SUM(montant),
+                0
+            )
+            FROM depenses
+            WHERE date(date_depense) = date('now')
+        """)
+
+        total_depenses = cur.fetchone()[0]
+
+        resultat = (
+            chiffre_affaires
+            - total_depenses
+        )
+
+        # ==========================
+        # Nombre de ventes aujourd'hui
+        # ==========================
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM ventes
+            WHERE date(date_vente) = date('now')
+        """)
+
+        nombre_ventes = cur.fetchone()[0]
+
+        # ==========================
         # Nombre de plats
         # ==========================
 
@@ -168,6 +229,14 @@ class AccueilPage(QWidget):
 
         self.ca.valeur.setText(
             f"{chiffre_affaires:,.0f} Ar"
+        )
+
+        self.resultat.valeur.setText(
+            f"{resultat:,.0f} Ar"
+        )
+
+        self.ventes.valeur.setText(
+            str(nombre_ventes)
         )
 
         self.plats.valeur.setText(
