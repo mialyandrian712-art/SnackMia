@@ -6,6 +6,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QPushButton
 )
+
+from app.database.database import get_connection
+
 from PySide6.QtCore import Qt
 
 
@@ -41,7 +44,6 @@ class Carte(QFrame):
         layout.addWidget(self.valeur)
 
         self.setLayout(layout)
-
 
 class AccueilPage(QWidget):
 
@@ -101,3 +103,81 @@ class AccueilPage(QWidget):
         layout.addStretch()
 
         self.setLayout(layout)
+
+        self.actualiser()
+
+    def actualiser(self):
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # ==========================
+        # Chiffre d'affaires du jour
+        # ==========================
+
+        cur.execute("""
+            SELECT COALESCE(
+                SUM(total),
+                0
+            )
+            FROM ventes
+            WHERE date(date_vente) = date('now')
+        """)
+
+        chiffre_affaires = cur.fetchone()[0]
+
+        # ==========================
+        # Nombre de plats
+        # ==========================
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM plats
+        """)
+
+        nombre_plats = cur.fetchone()[0]
+
+        # ==========================
+        # Nombre de produits en stock
+        # ==========================
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM stock
+        """)
+
+        nombre_stock = cur.fetchone()[0]
+
+        # ==========================
+        # Alertes stock
+        # ==========================
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM stock
+            WHERE quantite <= seuil
+        """)
+
+        nombre_alertes = cur.fetchone()[0]
+
+        conn.close()
+
+        # ==========================
+        # Affichage
+        # ==========================
+
+        self.ca.valeur.setText(
+            f"{chiffre_affaires:,.0f} Ar"
+        )
+
+        self.plats.valeur.setText(
+            str(nombre_plats)
+        )
+
+        self.stock.valeur.setText(
+            str(nombre_stock)
+        )
+
+        self.alertes.valeur.setText(
+            str(nombre_alertes)
+        )    
