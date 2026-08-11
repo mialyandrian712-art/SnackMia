@@ -273,25 +273,90 @@ class CaissePage(QWidget):
             )
             return
 
-        # Vérifier le stock avant toute modification
-        if not self.verifier_stock():
-            return
-
         conn = get_connection()
         cur = conn.cursor()
 
         try:
 
-            # Calcul du total
+            # ==================================
+            # 1. Vérifier tous les stocks
+            # ==================================
+
+            for nom, infos in self.panier.items():
+
+                quantite_plat = infos["quantite"]
+
+                # Récupérer l'ID du plat
+                cur.execute("""
+                    SELECT id
+                    FROM plats
+                    WHERE nom = ?
+                """, (nom,))
+
+                resultat = cur.fetchone()
+
+                if resultat is None:
+                    raise Exception(
+                        f"Le plat « {nom} » est introuvable."
+                    )
+
+                plat_id = resultat[0]
+
+                # Récupérer les ingrédients de la recette
+                cur.execute("""
+                    SELECT
+                        stock.id,
+                        stock.nom,
+                        stock.quantite,
+                        recettes.quantite
+                    FROM recettes
+                    JOIN stock
+                        ON recettes.stock_id = stock.id
+                    WHERE recettes.plat_id = ?
+                """, (plat_id,))
+
+                ingredients = cur.fetchall()
+
+                # Vérifier chaque ingrédient
+                for stock_id, nom_stock, stock_disponible, quantite_recette in ingredients:
+
+                    besoin = (
+                        quantite_recette
+                        * quantite_plat
+                    )
+
+                    if stock_disponible < besoin:
+
+                        conn.close()
+
+                        QMessageBox.warning(
+                            self,
+                            "Stock insuffisant",
+                            f"Le stock de « {nom_stock} » "
+                            f"est insuffisant.\n\n"
+                            f"Nécessaire : {besoin:g}\n"
+                            f"Disponible : {stock_disponible:g}"
+                        )
+
+                        return
+
+            # ==================================
+            # 2. Calculer le total
+            # ==================================
+
             total = 0
 
             for infos in self.panier.values():
-                total += infos["prix"] * infos["quantite"]
 
-            # Déstockage
-            self.destocker(cur)
+                total += (
+                    infos["prix"]
+                    * infos["quantite"]
+                )
 
-            # Enregistrement de la vente
+            # ==================================
+            # 3. Enregistrer la vente
+            # ==================================
+
             cur.execute("""
                 INSERT INTO ventes(
                     date_vente,
@@ -310,7 +375,10 @@ class CaissePage(QWidget):
 
             vente_id = cur.lastrowid
 
-            # Enregistrement des détails
+            # ==================================
+            # 4. Enregistrer les détails
+            # ==================================
+
             for nom, infos in self.panier.items():
 
                 cur.execute("""
@@ -320,7 +388,12 @@ class CaissePage(QWidget):
                         quantite,
                         prix
                     )
-                    VALUES(?,?,?,?)
+                    VALUES(
+                        ?,
+                        ?,
+                        ?,
+                        ?
+                    )
                 """, (
                     vente_id,
                     nom,
@@ -328,31 +401,72 @@ class CaissePage(QWidget):
                     infos["prix"]
                 ))
 
-            # Tout s'est bien passé
+            # ==================================
+            # 5. Déduire les ingrédients du stock
+            # ==================================
+
+            for nom, infos in self.panier.items():
+
+                quantite_plat = infos["quantite"]
+
+                cur.execute("""
+                    SELECT id
+                    FROM plats
+                    WHERE nom = ?
+                """, (nom,))
+
+                plat_id = cur.fetchone()[0]
+
+                cur.execute("""
+                    SELECT
+                        stock.id,
+                        recettes.quantite
+                    FROM recettes
+                    JOIN stock
+                        ON recettes.stock_id = stock.id
+                    WHERE recettes.plat_id = ?
+                """, (plat_id,))
+
+                ingredients = cur.fetchall()
+
+                for stock_id, quantite_recette in ingredients:
+
+                    quantite_a_retirer = (
+                        quantite_recette
+                        * quantite_plat
+                    )
+
+                    cur.execute("""
+                        UPDATE stock
+                        SET quantite = quantite - ?
+                        WHERE id = ?
+                    """, (
+                        quantite_a_retirer,
+                        stock_id
+                    ))
+
+            # ==================================
+            # 6. Valider définitivement
+            # ==================================
+
             conn.commit()
+            conn.close()
+
+            QMessageBox.information(
+                self,
+                "Succès",
+                "Vente enregistrée avec succès."
+            )
+
+            self.vider_ticket()
 
         except Exception as e:
 
-            # Annuler toutes les modifications
             conn.rollback()
+            conn.close()
 
             QMessageBox.critical(
                 self,
                 "Erreur",
                 f"La vente n'a pas pu être enregistrée.\n\n{e}"
             )
-
-            conn.close()
-            return
-
-        conn.close()
-
-        QMessageBox.information(
-            self,
-            "Succès",
-            "Vente enregistrée avec succès."
-        )
-
-        self.vente_enregistree.emit()
-
-        self.vider_ticket()
