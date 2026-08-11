@@ -4,7 +4,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QGridLayout,
     QFrame,
-    QPushButton
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView
 )
 
 from app.database.database import get_connection
@@ -109,6 +112,44 @@ class AccueilPage(QWidget):
         grille.addWidget(self.alertes, 2, 1)
 
         layout.addLayout(grille)
+
+        # ==========================
+        # Stock à surveiller
+        # ==========================
+
+        titre_stock = QLabel(
+            "⚠️ Stock à surveiller"
+        )
+
+        titre_stock.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(titre_stock)
+
+        self.table_alertes = QTableWidget()
+
+        self.table_alertes.setColumnCount(3)
+
+        self.table_alertes.setHorizontalHeaderLabels([
+            "Produit",
+            "Quantité",
+            "Seuil"
+        ])
+
+        self.table_alertes.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_alertes.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
+
+        layout.addWidget(
+            self.table_alertes
+        )
 
         bouton = QPushButton("🧾 Nouvelle vente")
         bouton.setFixedHeight(55)
@@ -221,6 +262,22 @@ class AccueilPage(QWidget):
 
         nombre_alertes = cur.fetchone()[0]
 
+        # ==========================
+        # Produits en stock faible
+        # ==========================
+
+        cur.execute("""
+            SELECT
+                nom,
+                quantite,
+                seuil
+            FROM stock
+            WHERE quantite <= seuil
+            ORDER BY quantite ASC
+        """)
+
+        alertes_stock = cur.fetchall()
+
         conn.close()
 
         # ==========================
@@ -250,3 +307,29 @@ class AccueilPage(QWidget):
         self.alertes.valeur.setText(
             str(nombre_alertes)
         )    
+
+        # ==========================
+        # Affichage des alertes stock
+        # ==========================
+
+        self.table_alertes.setRowCount(
+            len(alertes_stock)
+        )
+
+        for ligne, produit in enumerate(
+            alertes_stock
+        ):
+
+            for colonne, valeur in enumerate(
+                produit
+            ):
+
+                item = QTableWidgetItem(
+                    str(valeur)
+                )
+
+                self.table_alertes.setItem(
+                    ligne,
+                    colonne,
+                    item
+                )
