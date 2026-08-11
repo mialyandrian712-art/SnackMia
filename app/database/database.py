@@ -77,6 +77,43 @@ def create_database():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS plats_du_jour (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date_jour TEXT NOT NULL,
+        nom TEXT NOT NULL,
+        prix REAL NOT NULL,
+        disponible INTEGER DEFAULT 1
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS recettes_plats_du_jour (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plat_du_jour_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        quantite REAL NOT NULL,
+        FOREIGN KEY (plat_du_jour_id)
+            REFERENCES plats_du_jour(id),
+        FOREIGN KEY (stock_id)
+            REFERENCES stock(id)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS stock_plats_du_jour (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plat_du_jour_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        quantite REAL NOT NULL,
+        seuil REAL NOT NULL DEFAULT 0,
+        FOREIGN KEY (plat_du_jour_id)
+            REFERENCES plats_du_jour(id),
+        FOREIGN KEY (stock_id)
+            REFERENCES stock(id)
+    )
+    """)
+
     conn.commit()
     conn.close()
 

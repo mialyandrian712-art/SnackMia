@@ -32,6 +32,23 @@ class RecettesPage(QWidget):
 
         layout.addWidget(titre)
 
+        # Choix du type de recette
+
+        self.type_recette = QComboBox()
+
+        self.type_recette.addItems([
+            "🍔 Plat habituel",
+            "⭐ Plat du jour"
+        ])
+
+        layout.addWidget(
+            QLabel("Type de recette")
+        )
+
+        layout.addWidget(
+            self.type_recette
+        )
+
         # Choix du plat
 
         self.plat = QComboBox()
@@ -116,21 +133,43 @@ class RecettesPage(QWidget):
         self.plat.currentIndexChanged.connect(
             self.charger_recettes
         )
+        self.type_recette.currentIndexChanged.connect(
+            self.changer_type_recette
+        )
+
+    def changer_type_recette(self):
+
+        self.recette_selectionnee = None
+
+        self.charger_plats()
+        self.charger_recettes()    
 
     def charger_plats(self):
 
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
-            SELECT id, nom
-            FROM plats
-            ORDER BY nom
-        """)
-
         self.plat.clear()
 
+        if self.type_recette.currentIndex() == 0:
+
+            cur.execute("""
+                SELECT id, nom
+                FROM plats
+                ORDER BY nom
+            """)
+
+        else:
+
+            cur.execute("""
+                SELECT id, nom
+                FROM plats_du_jour
+                WHERE disponible = 1
+                ORDER BY nom
+            """)
+
         for plat_id, nom in cur.fetchall():
+
             self.plat.addItem(
                 nom,
                 plat_id
@@ -176,42 +215,118 @@ class RecettesPage(QWidget):
             )
             return
 
+        if self.plat.currentData() is None:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Sélectionne un plat."
+            )
+            return
+
+        if self.stock.currentData() is None:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Sélectionne un ingrédient."
+            )
+            return
+
+        try:
+            quantite = float(
+                self.quantite.text()
+            )
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "La quantité doit être un nombre."
+            )
+            return
+
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
-            SELECT COUNT(*)
-            FROM recettes
-            WHERE plat_id = ?
-            AND stock_id = ?
-        """, (
-            self.plat.currentData(),
-            self.stock.currentData()
-        ))
+        # ==========================
+        # PLAT HABITUEL
+        # ==========================
 
-        existe = cur.fetchone()[0]
+        if self.type_recette.currentIndex() == 0:
 
-        if existe > 0:
-            conn.close()
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM recettes
+                WHERE plat_id = ?
+                AND stock_id = ?
+            """, (
+                self.plat.currentData(),
+                self.stock.currentData()
+            ))
 
-            QMessageBox.warning(
-                self,
-                "Doublon",
-                "Cet ingrédient est déjà présent dans cette recette."
-            )
-            return
-        cur.execute("""
-            INSERT INTO recettes(
-                plat_id,
-                stock_id,
+            existe = cur.fetchone()[0]
+
+            if existe > 0:
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Doublon",
+                    "Cet ingrédient est déjà présent dans cette recette."
+                )
+                return
+
+            cur.execute("""
+                INSERT INTO recettes(
+                    plat_id,
+                    stock_id,
+                    quantite
+                )
+                VALUES(?,?,?)
+            """, (
+                self.plat.currentData(),
+                self.stock.currentData(),
                 quantite
-            )
-            VALUES(?,?,?)
-        """, (
-            self.plat.currentData(),
-            self.stock.currentData(),
-            float(self.quantite.text())
-        ))
+            ))
+
+        # ==========================
+        # PLAT DU JOUR
+        # ==========================
+
+        else:
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM recettes_plats_du_jour
+                WHERE plat_du_jour_id = ?
+                AND stock_id = ?
+            """, (
+                self.plat.currentData(),
+                self.stock.currentData()
+            ))
+
+            existe = cur.fetchone()[0]
+
+            if existe > 0:
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Doublon",
+                    "Cet ingrédient est déjà présent dans cette recette."
+                )
+                return
+
+            cur.execute("""
+                INSERT INTO recettes_plats_du_jour(
+                    plat_du_jour_id,
+                    stock_id,
+                    quantite
+                )
+                VALUES(?,?,?)
+            """, (
+                self.plat.currentData(),
+                self.stock.currentData(),
+                quantite
+            ))
 
         conn.commit()
         conn.close()
@@ -231,22 +346,6 @@ class RecettesPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
-            SELECT
-                recettes.id,
-                stock.nom,
-                recettes.quantite
-            FROM recettes
-            JOIN stock
-                ON recettes.stock_id = stock.id
-            WHERE recettes.plat_id = ?
-            ORDER BY stock.nom
-        """, (
-            self.plat.currentData(),
-        ))
-
-        recettes = cur.fetchall()
-
         self.table.setColumnCount(2)
 
         self.table.setHorizontalHeaderLabels([
@@ -254,11 +353,53 @@ class RecettesPage(QWidget):
             "Quantité"
         ])
 
-        self.table.setRowCount(len(recettes))
+        # ==========================
+        # PLAT HABITUEL
+        # ==========================
+
+        if self.type_recette.currentIndex() == 0:
+
+            cur.execute("""
+                SELECT
+                    recettes.id,
+                    stock.nom,
+                    recettes.quantite
+                FROM recettes
+                JOIN stock
+                    ON recettes.stock_id = stock.id
+                WHERE recettes.plat_id = ?
+                ORDER BY stock.nom
+            """, (
+                self.plat.currentData(),
+            ))
+
+        # ==========================
+        # PLAT DU JOUR
+        # ==========================
+
+        else:
+
+            cur.execute("""
+                SELECT
+                    recettes_plats_du_jour.id,
+                    stock.nom,
+                    recettes_plats_du_jour.quantite
+                FROM recettes_plats_du_jour
+                JOIN stock
+                    ON recettes_plats_du_jour.stock_id = stock.id
+                WHERE recettes_plats_du_jour.plat_du_jour_id = ?
+                ORDER BY stock.nom
+            """, (
+                self.plat.currentData(),
+            ))
+
+        recettes = cur.fetchall()
+
+        self.table.setRowCount(
+            len(recettes)
+        )
 
         for ligne, recette in enumerate(recettes):
-
-            # recette = (id, nom, quantité)
 
             self.table.setItem(
                 ligne,
@@ -269,11 +410,16 @@ class RecettesPage(QWidget):
             self.table.setItem(
                 ligne,
                 1,
-                QTableWidgetItem(str(recette[2]))
+                QTableWidgetItem(
+                    str(recette[2])
+                )
             )
 
-            # On cache l'id dans la première cellule
-            self.table.item(ligne, 0).setData(
+            # On garde l'id de la recette
+            self.table.item(
+                ligne,
+                0
+            ).setData(
                 1000,
                 recette[0]
             )
