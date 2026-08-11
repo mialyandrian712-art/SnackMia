@@ -297,6 +297,37 @@ class RapportsPage(QWidget):
 
         onglets = QTabWidget()
 
+        # ==========================
+        # Style des onglets
+        # ==========================
+
+        onglets.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #dddddd;
+                background: white;
+                border-radius: 8px;
+            }
+
+            QTabBar::tab {
+                background: #eeeeee;
+                padding: 10px 20px;
+                margin-right: 3px;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+
+            QTabBar::tab:selected {
+                background: #2D313A;
+                color: white;
+                font-weight: bold;
+            }
+
+            QTabBar::tab:hover {
+                background: #404652;
+                color: white;
+            }
+        """)
+
         # --------------------------
         # Onglet Produits
         # --------------------------
@@ -376,6 +407,8 @@ class RapportsPage(QWidget):
         # --------------------------
 
         layout.addWidget(onglets)
+
+        onglets.setMinimumHeight(400)
 
         self.setLayout(layout)
 
@@ -828,9 +861,15 @@ class RapportsPage(QWidget):
                     )
 
                     if item:
+
                         item.setText(
                             "⚠️ " + item.text()
                         )
+
+                        font = item.font()
+                        font.setBold(True)
+
+                        item.setFont(font)
 
         # ==========================
         # Affichage de l'historique
