@@ -457,18 +457,62 @@ class RecettesPage(QWidget):
             )
             return
 
+        if self.stock.currentData() is None:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Sélectionne un ingrédient."
+            )
+            return
+
+        try:
+            quantite = float(
+                self.quantite.text()
+            )
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "La quantité doit être un nombre."
+            )
+            return
+
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
-            UPDATE recettes
-            SET stock_id = ?, quantite = ?
-            WHERE id = ?
-        """, (
-            self.stock.currentData(),
-            float(self.quantite.text()),
-            self.recette_selectionnee
-        ))
+        # ==========================
+        # PLAT HABITUEL
+        # ==========================
+
+        if self.type_recette.currentIndex() == 0:
+
+            cur.execute("""
+                UPDATE recettes
+                SET stock_id = ?,
+                    quantite = ?
+                WHERE id = ?
+            """, (
+                self.stock.currentData(),
+                quantite,
+                self.recette_selectionnee
+            ))
+
+        # ==========================
+        # PLAT DU JOUR
+        # ==========================
+
+        else:
+
+            cur.execute("""
+                UPDATE recettes_plats_du_jour
+                SET stock_id = ?,
+                    quantite = ?
+                WHERE id = ?
+            """, (
+                self.stock.currentData(),
+                quantite,
+                self.recette_selectionnee
+            ))
 
         conn.commit()
         conn.close()
@@ -503,10 +547,31 @@ class RecettesPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute(
-            "DELETE FROM recettes WHERE id=?",
-            (self.recette_selectionnee,)
-        )
+        # ==========================
+        # PLAT HABITUEL
+        # ==========================
+
+        if self.type_recette.currentIndex() == 0:
+
+            cur.execute("""
+                DELETE FROM recettes
+                WHERE id = ?
+            """, (
+                self.recette_selectionnee,
+            ))
+
+        # ==========================
+        # PLAT DU JOUR
+        # ==========================
+
+        else:
+
+            cur.execute("""
+                DELETE FROM recettes_plats_du_jour
+                WHERE id = ?
+            """, (
+                self.recette_selectionnee,
+            ))
 
         conn.commit()
         conn.close()
