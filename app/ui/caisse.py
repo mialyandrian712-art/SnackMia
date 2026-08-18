@@ -4,13 +4,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QPushButton,
     QFrame,
     QMessageBox
 )
-from PySide6.QtCore import Signal
+
+from PySide6.QtCore import Signal, Qt
 
 from app.database.database import get_connection
+
 
 class CaissePage(QWidget):
 
@@ -44,9 +47,13 @@ class CaissePage(QWidget):
             self.ajouter_au_ticket
         )
 
-        gauche_layout.addWidget(self.liste_produits)
+        gauche_layout.addWidget(
+            self.liste_produits
+        )
 
-        gauche.setLayout(gauche_layout)
+        gauche.setLayout(
+            gauche_layout
+        )
 
         # ==========================
         # Partie droite : Ticket
@@ -70,38 +77,69 @@ class CaissePage(QWidget):
             font-weight:bold;
         """)
 
-        droite_layout.addWidget(titre_ticket)
+        droite_layout.addWidget(
+            titre_ticket
+        )
 
         self.ticket = QListWidget()
 
-        droite_layout.addWidget(self.ticket)
+        droite_layout.addWidget(
+            self.ticket
+        )
 
-        self.total = QLabel("Total : 0 Ar")
+        self.total = QLabel(
+            "Total : 0 Ar"
+        )
 
         self.total.setStyleSheet("""
             font-size:20px;
             font-weight:bold;
         """)
 
-        droite_layout.addWidget(self.total)
+        droite_layout.addWidget(
+            self.total
+        )
 
-        self.btn_vider = QPushButton("🗑️ Vider le ticket")
+        self.btn_vider = QPushButton(
+            "🗑️ Vider le ticket"
+        )
+
         self.btn_vider.setMinimumHeight(50)
 
-        droite_layout.addWidget(self.btn_vider)
+        droite_layout.addWidget(
+            self.btn_vider
+        )
 
-        self.btn_encaisser = QPushButton("💵 Encaisser")
+        self.btn_encaisser = QPushButton(
+            "💵 Encaisser"
+        )
+
         self.btn_encaisser.setMinimumHeight(50)
 
-        droite_layout.addWidget(self.btn_encaisser)
+        droite_layout.addWidget(
+            self.btn_encaisser
+        )
 
-        droite.setLayout(droite_layout)
+        droite.setLayout(
+            droite_layout
+        )
 
-        principal.addWidget(gauche, 2)
-        principal.addWidget(droite, 1)
+        principal.addWidget(
+            gauche,
+            2
+        )
 
-        self.setLayout(principal)
+        principal.addWidget(
+            droite,
+            1
+        )
+
+        self.setLayout(
+            principal
+        )
+
         self.charger_produits()
+
         self.btn_vider.clicked.connect(
             self.vider_ticket
         )
@@ -110,48 +148,157 @@ class CaissePage(QWidget):
             self.encaisser
         )
 
+    # =========================================================
+    # CHARGER LES PLATS HABITUELS + PLATS DU JOUR
+    # =========================================================
+
     def charger_produits(self):
 
         conn = get_connection()
         cur = conn.cursor()
 
+        self.liste_produits.clear()
+
+        # ==========================
+        # PLATS HABITUELS
+        # ==========================
+
+        item_titre = QListWidgetItem(
+            "🍔 PLATS HABITUELS"
+        )
+
+        item_titre.setFlags(
+            Qt.NoItemFlags
+        )
+
+        self.liste_produits.addItem(
+            item_titre
+        )
+
         cur.execute("""
-            SELECT nom, prix
+            SELECT
+                id,
+                nom,
+                prix
             FROM plats
+            WHERE disponible = 1
             ORDER BY categorie, nom
         """)
 
         produits = cur.fetchall()
 
-        self.liste_produits.clear()
+        for plat_id, nom, prix in produits:
 
-        for nom, prix in produits:
-            self.liste_produits.addItem(
+            item = QListWidgetItem(
                 f"{nom} - {int(prix)} Ar"
             )
 
+            item.setData(
+                Qt.UserRole,
+                {
+                    "type": "habituel",
+                    "id": plat_id,
+                    "nom": nom,
+                    "prix": prix
+                }
+            )
+
+            self.liste_produits.addItem(
+                item
+            )
+
+        # ==========================
+        # PLATS DU JOUR
+        # ==========================
+
+        cur.execute("""
+            SELECT
+                id,
+                nom,
+                prix
+            FROM plats_du_jour
+            WHERE disponible = 1
+            AND date_jour =
+                date('now', 'localtime')
+            ORDER BY nom
+        """)
+
+        plats_du_jour = cur.fetchall()
+
+        if plats_du_jour:
+
+            item_titre = QListWidgetItem(
+                "⭐ PLATS DU JOUR"
+            )
+
+            item_titre.setFlags(
+                Qt.NoItemFlags
+            )
+
+            self.liste_produits.addItem(
+                item_titre
+            )
+
+            for plat_id, nom, prix in plats_du_jour:
+
+                item = QListWidgetItem(
+                    f"{nom} - {int(prix)} Ar"
+                )
+
+                item.setData(
+                    Qt.UserRole,
+                    {
+                        "type": "jour",
+                        "id": plat_id,
+                        "nom": nom,
+                        "prix": prix
+                    }
+                )
+
+                self.liste_produits.addItem(
+                    item
+                )
+
         conn.close()
+
+    # =========================================================
+    # AJOUTER AU TICKET
+    # =========================================================
 
     def ajouter_au_ticket(self, item):
 
-        texte = item.text()
+        infos = item.data(
+            Qt.UserRole
+        )
 
-        nom, prix = texte.rsplit(" - ", 1)
+        # Ligne titre ou ligne non cliquable
+        if not infos:
+            return
 
-        prix = int(prix.replace(" Ar", ""))
+        cle = (
+            infos["type"],
+            infos["id"]
+        )
 
-        if nom in self.panier:
+        if cle in self.panier:
 
-            self.panier[nom]["quantite"] += 1
+            self.panier[cle]["quantite"] += 1
 
         else:
 
-            self.panier[nom] = {
-                "prix": prix,
+            self.panier[cle] = {
+                "type": infos["type"],
+                "id": infos["id"],
+                "nom": infos["nom"],
+                "prix": infos["prix"],
                 "quantite": 1
             }
 
         self.actualiser_ticket()
+
+    # =========================================================
+    # ACTUALISER LE TICKET
+    # =========================================================
 
     def actualiser_ticket(self):
 
@@ -159,22 +306,30 @@ class CaissePage(QWidget):
 
         total = 0
 
-        for nom, infos in self.panier.items():
+        for infos in self.panier.values():
 
             quantite = infos["quantite"]
             prix = infos["prix"]
 
-            sous_total = quantite * prix
+            sous_total = (
+                quantite * prix
+            )
 
             total += sous_total
 
             self.ticket.addItem(
-                f"{nom}   x{quantite}   {sous_total:,} Ar"
+                f"{infos['nom']}   "
+                f"x{quantite}   "
+                f"{sous_total:,.0f} Ar"
             )
 
         self.total.setText(
-            f"Total : {total:,} Ar"
+            f"Total : {total:,.0f} Ar"
         )
+
+    # =========================================================
+    # VIDER LE TICKET
+    # =========================================================
 
     def vider_ticket(self):
 
@@ -182,95 +337,20 @@ class CaissePage(QWidget):
 
         self.actualiser_ticket()
 
-    def verifier_stock(self):
+    # =========================================================
+    # ENCAISSER
+    # =========================================================
 
-        conn = get_connection()
-        cur = conn.cursor()
-
-        for nom_plat, infos in self.panier.items():
-
-            cur.execute("""
-                SELECT
-                    stock.nom,
-                    stock.quantite,
-                    recettes.quantite
-                FROM recettes
-                JOIN plats
-                    ON recettes.plat_id = plats.id
-                JOIN stock
-                    ON recettes.stock_id = stock.id
-                WHERE plats.nom = ?
-            """, (
-                nom_plat,
-            ))
-
-            ingredients = cur.fetchall()
-
-            for nom_stock, stock_disponible, quantite_recette in ingredients:
-
-                quantite_necessaire = (
-                    quantite_recette *
-                    infos["quantite"]
-                )
-
-                if stock_disponible < quantite_necessaire:
-
-                    conn.close()
-
-                    QMessageBox.warning(
-                        self,
-                        "Stock insuffisant",
-                        f"Il n'y a pas assez de '{nom_stock}' pour préparer {nom_plat}."
-                    )
-
-                    return False
-
-        conn.close()
-
-        return True
-
-    def destocker(self, cur):
-
-        for nom_plat, infos in self.panier.items():
-
-            cur.execute("""
-                SELECT
-                    recettes.stock_id,
-                    recettes.quantite
-                FROM recettes
-                JOIN plats
-                    ON recettes.plat_id = plats.id
-                WHERE plats.nom = ?
-            """, (
-                nom_plat,
-            ))
-
-            ingredients = cur.fetchall()
-
-            for stock_id, quantite_recette in ingredients:
-
-                quantite_necessaire = (
-                    quantite_recette *
-                    infos["quantite"]
-                )
-
-                cur.execute("""
-                    UPDATE stock
-                    SET quantite = quantite - ?
-                    WHERE id = ?
-                """, (
-                    quantite_necessaire,
-                    stock_id
-                ))
-    
     def encaisser(self):
 
         if not self.panier:
+
             QMessageBox.warning(
                 self,
                 "Ticket vide",
                 "Ajoutez au moins un produit."
             )
+
             return
 
         conn = get_connection()
@@ -278,71 +358,139 @@ class CaissePage(QWidget):
 
         try:
 
-            # ==================================
-            # 1. Vérifier tous les stocks
-            # ==================================
+            # =================================================
+            # 1. VÉRIFIER TOUS LES STOCKS
+            # =================================================
 
-            for nom, infos in self.panier.items():
+            for infos in self.panier.values():
 
-                quantite_plat = infos["quantite"]
+                quantite_plat = infos[
+                    "quantite"
+                ]
 
-                # Récupérer l'ID du plat
-                cur.execute("""
-                    SELECT id
-                    FROM plats
-                    WHERE nom = ?
-                """, (nom,))
+                plat_id = infos["id"]
 
-                resultat = cur.fetchone()
+                # =============================================
+                # PLAT HABITUEL
+                # =============================================
 
-                if resultat is None:
-                    raise Exception(
-                        f"Le plat « {nom} » est introuvable."
-                    )
+                if infos["type"] == "habituel":
 
-                plat_id = resultat[0]
+                    cur.execute("""
+                        SELECT
+                            stock.id,
+                            stock.nom,
+                            stock.quantite,
+                            recettes.quantite
+                        FROM recettes
+                        JOIN stock
+                            ON recettes.stock_id =
+                               stock.id
+                        WHERE recettes.plat_id = ?
+                    """, (
+                        plat_id,
+                    ))
 
-                # Récupérer les ingrédients de la recette
-                cur.execute("""
-                    SELECT
-                        stock.id,
-                        stock.nom,
-                        stock.quantite,
-                        recettes.quantite
-                    FROM recettes
-                    JOIN stock
-                        ON recettes.stock_id = stock.id
-                    WHERE recettes.plat_id = ?
-                """, (plat_id,))
+                    ingredients = cur.fetchall()
 
-                ingredients = cur.fetchall()
+                    if not ingredients:
 
-                # Vérifier chaque ingrédient
-                for stock_id, nom_stock, stock_disponible, quantite_recette in ingredients:
-
-                    besoin = (
-                        quantite_recette
-                        * quantite_plat
-                    )
-
-                    if stock_disponible < besoin:
-
-                        conn.close()
-
-                        QMessageBox.warning(
-                            self,
-                            "Stock insuffisant",
-                            f"Le stock de « {nom_stock} » "
-                            f"est insuffisant.\n\n"
-                            f"Nécessaire : {besoin:g}\n"
-                            f"Disponible : {stock_disponible:g}"
+                        raise Exception(
+                            f"Le plat « {infos['nom']} » "
+                            "n'a pas encore de recette."
                         )
 
-                        return
+                    for (
+                        stock_id,
+                        nom_stock,
+                        stock_disponible,
+                        quantite_recette
+                    ) in ingredients:
 
-            # ==================================
-            # 2. Calculer le total
-            # ==================================
+                        besoin = (
+                            quantite_recette
+                            * quantite_plat
+                        )
+
+                        if (
+                            stock_disponible
+                            < besoin
+                        ):
+
+                            raise Exception(
+                                f"Stock insuffisant pour "
+                                f"« {nom_stock} ».\n\n"
+                                f"Plat : {infos['nom']}\n"
+                                f"Nécessaire : {besoin:g}\n"
+                                f"Disponible : "
+                                f"{stock_disponible:g}"
+                            )
+
+                # =============================================
+                # PLAT DU JOUR
+                # =============================================
+
+                else:
+
+                    cur.execute("""
+                        SELECT
+                            stock_plats_du_jour.id,
+                            stock.nom,
+                            stock_plats_du_jour.quantite,
+                            recettes_plats_du_jour.quantite
+                        FROM recettes_plats_du_jour
+                        JOIN stock
+                            ON recettes_plats_du_jour.stock_id =
+                               stock.id
+                        JOIN stock_plats_du_jour
+                            ON stock_plats_du_jour.stock_id =
+                               recettes_plats_du_jour.stock_id
+                            AND stock_plats_du_jour.plat_du_jour_id =
+                               recettes_plats_du_jour.plat_du_jour_id
+                        WHERE recettes_plats_du_jour.plat_du_jour_id = ?
+                    """, (
+                        plat_id,
+                    ))
+
+                    ingredients = cur.fetchall()
+
+                    if not ingredients:
+
+                        raise Exception(
+                            f"Le plat du jour "
+                            f"« {infos['nom']} » "
+                            "n'a pas encore de recette."
+                        )
+
+                    for (
+                        stock_jour_id,
+                        nom_stock,
+                        stock_disponible,
+                        quantite_recette
+                    ) in ingredients:
+
+                        besoin = (
+                            quantite_recette
+                            * quantite_plat
+                        )
+
+                        if (
+                            stock_disponible
+                            < besoin
+                        ):
+
+                            raise Exception(
+                                f"Stock du jour insuffisant "
+                                f"pour « {nom_stock} ».\n\n"
+                                f"Plat : {infos['nom']}\n"
+                                f"Nécessaire : {besoin:g}\n"
+                                f"Disponible : "
+                                f"{stock_disponible:g}"
+                            )
+
+            # =================================================
+            # 2. CALCULER LE TOTAL
+            # =================================================
 
             total = 0
 
@@ -353,9 +501,9 @@ class CaissePage(QWidget):
                     * infos["quantite"]
                 )
 
-            # ==================================
-            # 3. Enregistrer la vente
-            # ==================================
+            # =================================================
+            # 3. ENREGISTRER LA VENTE
+            # =================================================
 
             cur.execute("""
                 INSERT INTO ventes(
@@ -364,7 +512,7 @@ class CaissePage(QWidget):
                     mode_paiement
                 )
                 VALUES(
-                    datetime('now'),
+                    datetime('now', 'localtime'),
                     ?,
                     ?
                 )
@@ -375,11 +523,11 @@ class CaissePage(QWidget):
 
             vente_id = cur.lastrowid
 
-            # ==================================
-            # 4. Enregistrer les détails
-            # ==================================
+            # =================================================
+            # 4. ENREGISTRER LES DÉTAILS
+            # =================================================
 
-            for nom, infos in self.panier.items():
+            for infos in self.panier.values():
 
                 cur.execute("""
                     INSERT INTO details_vente(
@@ -396,61 +544,111 @@ class CaissePage(QWidget):
                     )
                 """, (
                     vente_id,
-                    nom,
+                    infos["nom"],
                     infos["quantite"],
                     infos["prix"]
                 ))
 
-            # ==================================
-            # 5. Déduire les ingrédients du stock
-            # ==================================
+            # =================================================
+            # 5. DÉDUIRE LE STOCK
+            # =================================================
 
-            for nom, infos in self.panier.items():
+            for infos in self.panier.values():
 
-                quantite_plat = infos["quantite"]
+                quantite_plat = infos[
+                    "quantite"
+                ]
 
-                cur.execute("""
-                    SELECT id
-                    FROM plats
-                    WHERE nom = ?
-                """, (nom,))
+                plat_id = infos["id"]
 
-                plat_id = cur.fetchone()[0]
+                # =============================================
+                # STOCK HABITUEL
+                # =============================================
 
-                cur.execute("""
-                    SELECT
-                        stock.id,
-                        recettes.quantite
-                    FROM recettes
-                    JOIN stock
-                        ON recettes.stock_id = stock.id
-                    WHERE recettes.plat_id = ?
-                """, (plat_id,))
-
-                ingredients = cur.fetchall()
-
-                for stock_id, quantite_recette in ingredients:
-
-                    quantite_a_retirer = (
-                        quantite_recette
-                        * quantite_plat
-                    )
+                if infos["type"] == "habituel":
 
                     cur.execute("""
-                        UPDATE stock
-                        SET quantite = quantite - ?
-                        WHERE id = ?
+                        SELECT
+                            stock_id,
+                            quantite
+                        FROM recettes
+                        WHERE plat_id = ?
                     """, (
-                        quantite_a_retirer,
-                        stock_id
+                        plat_id,
                     ))
 
-            # ==================================
-            # 6. Valider définitivement
-            # ==================================
+                    ingredients = cur.fetchall()
+
+                    for (
+                        stock_id,
+                        quantite_recette
+                    ) in ingredients:
+
+                        a_retirer = (
+                            quantite_recette
+                            * quantite_plat
+                        )
+
+                        cur.execute("""
+                            UPDATE stock
+                            SET quantite =
+                                quantite - ?
+                            WHERE id = ?
+                        """, (
+                            a_retirer,
+                            stock_id
+                        ))
+
+                # =============================================
+                # STOCK DU JOUR
+                # =============================================
+
+                else:
+
+                    cur.execute("""
+                        SELECT
+                            stock_id,
+                            quantite
+                        FROM recettes_plats_du_jour
+                        WHERE plat_du_jour_id = ?
+                    """, (
+                        plat_id,
+                    ))
+
+                    ingredients = cur.fetchall()
+
+                    for (
+                        stock_id,
+                        quantite_recette
+                    ) in ingredients:
+
+                        a_retirer = (
+                            quantite_recette
+                            * quantite_plat
+                        )
+
+                        cur.execute("""
+                            UPDATE stock_plats_du_jour
+                            SET quantite =
+                                quantite - ?
+                            WHERE plat_du_jour_id = ?
+                            AND stock_id = ?
+                        """, (
+                            a_retirer,
+                            plat_id,
+                            stock_id
+                        ))
+
+            # =================================================
+            # 6. VALIDER
+            # =================================================
 
             conn.commit()
+
             conn.close()
+
+            # Actualiser les autres pages
+            self.vente_enregistree.emit()
 
             QMessageBox.information(
                 self,

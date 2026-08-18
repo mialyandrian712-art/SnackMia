@@ -109,6 +109,11 @@ class StockPage(QWidget):
         self.quantite = QLineEdit()
         self.quantite.setPlaceholderText("Quantité")
 
+        self.prix_achat = QLineEdit()
+        self.prix_achat.setPlaceholderText(
+            "Prix d'achat unitaire (Ar)"
+        )
+
         self.unite = QComboBox()
         self.unite.addItems([
             "Pièce",
@@ -123,6 +128,7 @@ class StockPage(QWidget):
 
         layout.addWidget(self.nom)
         layout.addWidget(self.quantite)
+        layout.addWidget(self.prix_achat)
         layout.addWidget(self.unite)
         layout.addWidget(self.seuil)
 
@@ -150,7 +156,12 @@ class StockPage(QWidget):
         )
 
         self.charger_plats_du_jour()
+
         self.charger_produits_du_jour()
+
+        self.plat_du_jour.currentIndexChanged.connect(
+            self.charger_stock
+        )
         self.charger_stock()
         self.changer_type_stock()
 
@@ -158,6 +169,8 @@ class StockPage(QWidget):
 
         conn = get_connection()
         cur = conn.cursor()
+
+        self.table.clearSpans()
 
         # ==========================
         # STOCK HABITUEL
@@ -171,21 +184,23 @@ class StockPage(QWidget):
                     nom,
                     quantite,
                     unite,
-                    seuil
+                    seuil,
+                    prix_achat
                 FROM stock
                 ORDER BY nom
             """)
 
             produits = cur.fetchall()
 
-            self.table.setColumnCount(5)
+            self.table.setColumnCount(6)
 
             self.table.setHorizontalHeaderLabels([
                 "ID",
                 "Produit",
                 "Quantité",
                 "Unité",
-                "Seuil"
+                "Seuil",
+                "Prix d'achat (Ar)"
             ])
 
             self.table.setRowCount(
@@ -228,10 +243,13 @@ class StockPage(QWidget):
                     ON stock_plats_du_jour.stock_id
                     = stock.id
 
-                ORDER BY
-                    plats_du_jour.nom,
-                    stock.nom
-            """)
+                WHERE plats_du_jour.date_jour =
+                    date('now', 'localtime')
+                AND stock_plats_du_jour.plat_du_jour_id = ?
+                ORDER BY stock.nom
+            """, (
+                self.plat_du_jour.currentData(),
+            ))
 
             produits = cur.fetchall()
 
@@ -243,7 +261,8 @@ class StockPage(QWidget):
                 "Produit",
                 "Quantité",
                 "Unité",
-                "Seuil"
+                "Seuil",
+                "Prix d'achat (Ar)"
             ])
 
             self.table.setRowCount(
@@ -283,8 +302,6 @@ class StockPage(QWidget):
 
                 fin = ligne
 
-                # Si le plat possède plusieurs ingrédients,
-                # on fusionne visuellement les cellules.
                 if fin > debut:
 
                     self.table.setSpan(
@@ -319,7 +336,7 @@ class StockPage(QWidget):
                 ligne += 1
 
         conn.close()
-
+    
     def charger_plats_du_jour(self):
 
         conn = get_connection()
@@ -329,6 +346,7 @@ class StockPage(QWidget):
             SELECT id, nom
             FROM plats_du_jour
             WHERE disponible = 1
+            AND date_jour = date('now', 'localtime')
             ORDER BY nom
         """)
 
@@ -396,6 +414,10 @@ class StockPage(QWidget):
                 self.table.item(ligne, 4).text()
             )
 
+            self.prix_achat.setText(
+                self.table.item(ligne, 5).text()
+            )
+
         # ==========================
         # STOCK DU JOUR
         # ==========================
@@ -406,20 +428,39 @@ class StockPage(QWidget):
                 self.table.item(ligne, 0).text()
             )
 
-            # Produit
+            # Plat du jour
+            plat = self.table.item(
+                ligne,
+                1
+            ).text()
+
+            # Enlever ⭐ devant le nom
+            plat = plat.replace("⭐ ", "")
+
+            index_plat = self.plat_du_jour.findText(
+                plat
+            )
+
+            if index_plat >= 0:
+
+                self.plat_du_jour.setCurrentIndex(
+                    index_plat
+                )
+
+            # Ingrédient
             produit = self.table.item(
                 ligne,
                 2
             ).text()
 
-            index = self.produit_du_jour.findText(
+            index_produit = self.produit_du_jour.findText(
                 produit
             )
 
-            if index >= 0:
+            if index_produit >= 0:
 
                 self.produit_du_jour.setCurrentIndex(
-                    index
+                    index_produit
                 )
 
             # Quantité
@@ -444,7 +485,7 @@ class StockPage(QWidget):
                     ligne,
                     5
                 ).text()
-            )
+            )    
 
     def ajouter_produit(self):
 
@@ -492,11 +533,11 @@ class StockPage(QWidget):
 
             try:
                 quantite = float(
-                    self.quantite.text()
+                    self.quantite.text().replace(",", ".")
                 )
 
                 seuil = float(
-                    self.seuil.text()
+                    self.seuil.text().replace(",", ".")
                 )
 
             except ValueError:
@@ -540,7 +581,7 @@ class StockPage(QWidget):
                     plat_du_jour_id,
                     stock_id,
                     quantite,
-                    seuil
+                    seuil,
                 )
                 VALUES(?,?,?,?)
             """, (
@@ -593,6 +634,9 @@ class StockPage(QWidget):
             seuil = float(
                 self.seuil.text()
             )
+            prix_achat = float(
+                self.prix_achat.text().replace(",", ".")
+            )
 
         except ValueError:
 
@@ -610,14 +654,16 @@ class StockPage(QWidget):
                 nom,
                 quantite,
                 unite,
-                seuil
+                seuil,
+                prix_achat
             )
-            VALUES(?,?,?,?)
+            VALUES(?,?,?,?,?)
         """, (
             self.nom.text(),
             quantite,
             self.unite.currentText(),
-            seuil
+            seuil,
+            prix_achat
         ))
 
         conn.commit()
@@ -625,6 +671,7 @@ class StockPage(QWidget):
 
         self.nom.clear()
         self.quantite.clear()
+        self.prix_achat.clear()
         self.seuil.clear()
 
         self.charger_produits_du_jour()
@@ -639,33 +686,162 @@ class StockPage(QWidget):
     def modifier_produit(self):
 
         if self.id_selectionne is None:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "Sélectionne un produit."
             )
+
             return
 
         conn = get_connection()
         cur = conn.cursor()
 
+        # ==========================
+        # STOCK DU JOUR
+        # ==========================
+
+        if self.type_stock.currentIndex() == 1:
+
+            if self.plat_du_jour.currentData() is None:
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "Sélectionne un plat du jour."
+                )
+
+                return
+
+            if self.produit_du_jour.currentData() is None:
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "Sélectionne un ingrédient."
+                )
+
+                return
+
+            try:
+
+                quantite = float(
+                    self.quantite.text().replace(",", ".")
+                )
+
+                seuil = float(
+                    self.seuil.text().replace(",", ".")
+                )
+
+            except ValueError:
+
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "La quantité et le seuil doivent être des nombres."
+                )
+
+                return
+
+            cur.execute("""
+                UPDATE stock_plats_du_jour
+                SET
+                    plat_du_jour_id = ?,
+                    stock_id = ?,
+                    quantite = ?,
+                    seuil = ?
+                WHERE id = ?
+            """, (
+                self.plat_du_jour.currentData(),
+                self.produit_du_jour.currentData(),
+                quantite,
+                seuil,
+            ))
+
+            conn.commit()
+            conn.close()
+
+            self.charger_stock()
+
+            QMessageBox.information(
+                self,
+                "Succès",
+                "Stock du jour modifié."
+            )
+
+            return
+
+        # ==========================
+        # STOCK HABITUEL
+        # ==========================
+
+        if self.nom.text() == "":
+
+            conn.close()
+
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Le nom du produit est obligatoire."
+            )
+
+            return
+
+        try:
+
+            quantite = float(
+                self.quantite.text()
+            )
+
+            seuil = float(
+                self.seuil.text()
+            )
+
+            prix_achat = float(
+                self.prix_achat.text().replace(",", ".")
+            )
+
+        except ValueError:
+
+            conn.close()
+
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "La quantité et le seuil doivent être des nombres."
+            )
+
+            return
+
         cur.execute("""
             UPDATE stock
-            SET nom=?, quantite=?, unite=?, seuil=?
-            WHERE id=?
+            SET
+                nom = ?,
+                quantite = ?,
+                unite = ?,
+                seuil = ?,
+                prix_achat = ?
+            WHERE id = ?
         """, (
             self.nom.text(),
-            float(self.quantite.text()),
+            quantite,
             self.unite.currentText(),
-            float(self.seuil.text()),
+            seuil,
+            prix_achat,
             self.id_selectionne
         ))
 
         conn.commit()
         conn.close()
 
+        self.charger_produits_du_jour()
         self.charger_stock()
-
+ 
         QMessageBox.information(
             self,
             "Succès",
@@ -676,17 +852,19 @@ class StockPage(QWidget):
     def supprimer_produit(self):
 
         if self.id_selectionne is None:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "Sélectionne un produit."
             )
+
             return
 
         reponse = QMessageBox.question(
             self,
             "Confirmation",
-            "Supprimer ce produit ?"
+            "Supprimer cet ingrédient ?"
         )
 
         if reponse != QMessageBox.Yes:
@@ -695,10 +873,47 @@ class StockPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute(
-            "DELETE FROM stock WHERE id=?",
-            (self.id_selectionne,)
-        )
+        # ==========================
+        # STOCK DU JOUR
+        # ==========================
+
+        if self.type_stock.currentIndex() == 1:
+
+            cur.execute("""
+                DELETE FROM stock_plats_du_jour
+                WHERE id = ?
+            """, (
+                self.id_selectionne,
+            ))
+
+            conn.commit()
+            conn.close()
+
+            self.id_selectionne = None
+
+            self.quantite.clear()
+            self.seuil.clear()
+
+            self.charger_stock()
+
+            QMessageBox.information(
+                self,
+                "Succès",
+                "Ingrédient supprimé du stock du jour."
+            )
+
+            return
+
+        # ==========================
+        # STOCK HABITUEL
+        # ==========================
+
+        cur.execute("""
+            DELETE FROM stock
+            WHERE id = ?
+        """, (
+            self.id_selectionne,
+        ))
 
         conn.commit()
         conn.close()
@@ -709,6 +924,7 @@ class StockPage(QWidget):
         self.quantite.clear()
         self.seuil.clear()
 
+        self.charger_produits_du_jour()
         self.charger_stock()
 
         QMessageBox.information(

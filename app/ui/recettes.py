@@ -165,6 +165,7 @@ class RecettesPage(QWidget):
                 SELECT id, nom
                 FROM plats_du_jour
                 WHERE disponible = 1
+                AND date_jour = date('now', 'localtime')
                 ORDER BY nom
             """)
 
@@ -233,7 +234,7 @@ class RecettesPage(QWidget):
 
         try:
             quantite = float(
-                self.quantite.text()
+                self.quantite.text().replace(",", ".")
             )
         except ValueError:
             QMessageBox.warning(
@@ -362,6 +363,7 @@ class RecettesPage(QWidget):
             cur.execute("""
                 SELECT
                     recettes.id,
+                    recettes.stock_id,
                     stock.nom,
                     recettes.quantite
                 FROM recettes
@@ -382,6 +384,7 @@ class RecettesPage(QWidget):
             cur.execute("""
                 SELECT
                     recettes_plats_du_jour.id,
+                    recettes_plats_du_jour.stock_id,
                     stock.nom,
                     recettes_plats_du_jour.quantite
                 FROM recettes_plats_du_jour
@@ -401,27 +404,38 @@ class RecettesPage(QWidget):
 
         for ligne, recette in enumerate(recettes):
 
+            # Nom de l'ingrédient
             self.table.setItem(
                 ligne,
                 0,
-                QTableWidgetItem(recette[1])
+                QTableWidgetItem(recette[2])
             )
 
+            # Quantité
             self.table.setItem(
                 ligne,
                 1,
                 QTableWidgetItem(
-                    str(recette[2])
+                    str(recette[3])
                 )
             )
-
-            # On garde l'id de la recette
+     
+            # ID de la recette
             self.table.item(
                 ligne,
                 0
             ).setData(
                 1000,
                 recette[0]
+            )
+
+            # ID du produit dans le stock
+            self.table.item(
+                ligne,
+                0
+            ).setData(
+                1001,
+                recette[1]
             )
 
         conn.close()
@@ -434,17 +448,34 @@ class RecettesPage(QWidget):
 
     def selectionner_recette(self, ligne, colonne):
 
+        # ID de la recette
         self.recette_selectionnee = self.table.item(
             ligne,
             0
         ).data(1000)
 
-        self.stock.setCurrentText(
-            self.table.item(ligne, 0).text()
+        # ID exact de l'ingrédient
+        stock_id = self.table.item(
+            ligne,
+            0
+        ).data(1001)
+
+        # Sélectionner l'ingrédient avec son ID
+        index = self.stock.findData(
+            stock_id
         )
 
+        if index >= 0:
+            self.stock.setCurrentIndex(
+                index
+            )
+
+        # Quantité
         self.quantite.setText(
-            self.table.item(ligne, 1).text()
+            self.table.item(
+                ligne,
+                1
+            ).text()
         )
 
     def modifier_recette(self):
@@ -467,7 +498,7 @@ class RecettesPage(QWidget):
 
         try:
             quantite = float(
-                self.quantite.text()
+                self.quantite.text().replace(",", ".")
             )
         except ValueError:
             QMessageBox.warning(

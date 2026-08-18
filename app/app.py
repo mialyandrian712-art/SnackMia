@@ -151,7 +151,7 @@ class SnackMia(QMainWindow):
             lambda: self.pages.setCurrentWidget(self.plats_du_jour)
         )
         self.btn_caisse.clicked.connect(
-            lambda: self.pages.setCurrentWidget(self.caisse)
+            self.ouvrir_caisse
         )
         self.btn_ventes.clicked.connect(
             self.ouvrir_ventes
@@ -176,6 +176,14 @@ class SnackMia(QMainWindow):
         self.pages.setCurrentWidget(
             self.accueil
         )    
+
+    def ouvrir_caisse(self):
+
+        self.caisse.charger_produits()
+
+        self.pages.setCurrentWidget(
+            self.caisse
+        )
 
     def actualiser_apres_vente(self):
 

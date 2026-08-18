@@ -130,6 +130,14 @@ def update_database():
         # La colonne existe déjà
         pass
 
+    try:
+        cursor.execute("""
+            ALTER TABLE stock
+            ADD COLUMN prix_achat REAL DEFAULT 0
+        """)
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
 if __name__ == "__main__":

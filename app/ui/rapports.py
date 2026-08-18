@@ -143,7 +143,7 @@ class RapportsPage(QWidget):
         # ==========================
 
         titre_stock = QLabel(
-            "📦 État du stock"
+            "📦 État du stock habituel"
         )
 
         titre_stock.setStyleSheet("""
@@ -174,6 +174,40 @@ class RapportsPage(QWidget):
         )
 
         layout.addWidget(self.table_stock)
+
+        # ==========================
+        # Stock du jour
+        # ==========================
+
+        titre_stock_jour = QLabel(
+            "⭐ État du stock du jour"
+        )
+
+        titre_stock_jour.setStyleSheet("""
+            font-size:20px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        self.table_stock_jour = QTableWidget()
+
+        self.table_stock_jour.setColumnCount(5)
+
+        self.table_stock_jour.setHorizontalHeaderLabels([
+            "Plat du jour",
+            "Produit",
+            "Quantité",
+            "Unité",
+            "Seuil"
+        ])
+
+        self.table_stock_jour.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
+
+        self.table_stock_jour.setEditTriggers(
+            QTableWidget.NoEditTriggers
+        )
 
         # ==========================
         # Historique des ventes
@@ -356,6 +390,9 @@ class RapportsPage(QWidget):
 
         layout_stock.addWidget(titre_stock)
         layout_stock.addWidget(self.table_stock)
+
+        layout_stock.addWidget(titre_stock_jour)
+        layout_stock.addWidget(self.table_stock_jour)
 
         page_stock.setLayout(
             layout_stock
@@ -767,6 +804,31 @@ class RapportsPage(QWidget):
         stock = cur.fetchall()   
 
         # ==========================
+        # État du stock du jour
+        # ==========================
+
+        cur.execute("""
+            SELECT
+                plats_du_jour.nom,
+                stock.nom,
+                stock_plats_du_jour.quantite,
+                stock.unite,
+                stock_plats_du_jour.seuil
+            FROM stock_plats_du_jour
+            JOIN plats_du_jour
+                ON stock_plats_du_jour.plat_du_jour_id
+                = plats_du_jour.id
+            JOIN stock
+                ON stock_plats_du_jour.stock_id
+                = stock.id
+            WHERE plats_du_jour.date_jour =
+                date('now', 'localtime')
+            ORDER BY plats_du_jour.nom, stock.nom
+        """)
+
+        stock_jour = cur.fetchall()
+
+        # ==========================
         # Affichage
         # ==========================
 
@@ -870,6 +932,57 @@ class RapportsPage(QWidget):
                         font.setBold(True)
 
                         item.setFont(font)
+
+        # ==========================
+        # Affichage du stock du jour
+        # ==========================
+
+        self.table_stock_jour.setRowCount(
+            len(stock_jour)
+        )
+
+        for ligne, produit in enumerate(stock_jour):
+
+            plat, nom, quantite, unite, seuil = produit
+
+            valeurs = [
+                plat,
+                nom,
+                quantite,
+                unite,
+                seuil
+            ]
+ 
+        for colonne, valeur in enumerate(valeurs):
+
+            item = QTableWidgetItem(
+                str(valeur)
+            )
+
+            self.table_stock_jour.setItem(
+                ligne,
+                colonne,
+                item
+            )
+
+        # Alerte stock faible
+        if quantite <= seuil:
+
+            for colonne in range(5):
+
+                item = self.table_stock_jour.item(
+                    ligne,
+                    colonne
+                )
+
+                if item:
+                    item.setText(
+                        "⚠️ " + item.text()
+                    )
+
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
 
         # ==========================
         # Affichage de l'historique
