@@ -192,7 +192,7 @@ class StockPage(QWidget):
 
             produits = cur.fetchall()
 
-            self.table.setColumnCount(6)
+            self.table.setColumnCount(7)
 
             self.table.setHorizontalHeaderLabels([
                 "ID",
@@ -200,7 +200,8 @@ class StockPage(QWidget):
                 "Quantité",
                 "Unité",
                 "Seuil",
-                "Prix d'achat (Ar)"
+                "Prix d'achat unitaire (Ar)",
+                "Valeur du stock (Ar)"
             ])
 
             self.table.setRowCount(
@@ -209,7 +210,27 @@ class StockPage(QWidget):
 
             for ligne, produit in enumerate(produits):
 
-                for colonne, valeur in enumerate(produit):
+                id_produit = produit[0]
+                nom = produit[1]
+                quantite = float(produit[2])
+                unite = produit[3]
+                seuil = float(produit[4])
+                prix_achat = float(produit[5] or 0)
+
+                # Calcul automatique de la valeur totale du stock
+                valeur_stock = quantite * prix_achat
+
+                valeurs = [
+                    id_produit,
+                    nom,
+                    quantite,
+                    unite,
+                    seuil,
+                    prix_achat,
+                    valeur_stock
+                ]
+
+                for colonne, valeur in enumerate(valeurs):
 
                     self.table.setItem(
                         ligne,

@@ -138,8 +138,25 @@ def update_database():
     except sqlite3.OperationalError:
         pass
 
+    try:
+        cursor.execute("""
+            ALTER TABLE details_vente
+            ADD COLUMN plat_id INTEGER DEFAULT 0
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
+            ALTER TABLE details_vente
+            ADD COLUMN type_plat TEXT DEFAULT 'habituel'
+        """)
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
+    
 if __name__ == "__main__":
     create_database()
     update_database()

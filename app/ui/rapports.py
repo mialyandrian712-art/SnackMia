@@ -80,6 +80,11 @@ class RapportsPage(QWidget):
             "0 Ar"
         )
 
+        self.cout_ingredients = self.creer_carte(
+            "🍳 Coût des ingrédients",
+            "0 Ar"
+        )
+
         self.resultat = self.creer_carte(
             "📈 Résultat",
             "0 Ar"
@@ -97,6 +102,7 @@ class RapportsPage(QWidget):
 
         cartes.addWidget(self.ca)
         cartes.addWidget(self.depenses)
+        cartes.addWidget(self.cout_ingredients)
         cartes.addWidget(self.resultat)
         cartes.addWidget(self.nombre_ventes)
         cartes.addWidget(self.panier_moyen)
@@ -647,6 +653,62 @@ class RapportsPage(QWidget):
         nombre_ventes = cur.fetchone()[0]
 
         # ==========================
+        # Coût des ingrédients
+        # ==========================
+
+        cur.execute(f"""
+            SELECT
+                COALESCE(
+                    SUM(
+                        details_vente.quantite
+                        * recettes.quantite
+                        * stock.prix_achat
+                    ),
+                    0
+                )
+            FROM details_vente
+            JOIN ventes
+                ON details_vente.vente_id = ventes.id
+            JOIN recettes
+                ON details_vente.plat_id = recettes.plat_id
+            JOIN stock
+                ON recettes.stock_id = stock.id
+            WHERE details_vente.type_plat = 'habituel'
+            AND {condition}
+        """)
+
+        cout_ingredients_habituels = cur.fetchone()[0]
+
+        cur.execute(f"""
+            SELECT
+                COALESCE(
+                    SUM(
+                        details_vente.quantite
+                        * recettes_plats_du_jour.quantite
+                        * stock.prix_achat
+                    ),
+                    0
+                )
+            FROM details_vente
+            JOIN ventes
+                ON details_vente.vente_id = ventes.id
+            JOIN recettes_plats_du_jour
+                ON details_vente.plat_id =
+                   recettes_plats_du_jour.plat_du_jour_id
+            JOIN stock
+                ON recettes_plats_du_jour.stock_id = stock.id
+            WHERE details_vente.type_plat = 'jour'
+            AND {condition}
+        """)
+
+        cout_ingredients_jour = cur.fetchone()[0]
+
+        cout_ingredients = (
+            cout_ingredients_habituels
+            + cout_ingredients_jour
+        )
+
+        # ==========================
         # Résultat
         # ==========================
 
@@ -840,6 +902,10 @@ class RapportsPage(QWidget):
             f"{total_depenses:,.0f} Ar"
         )
 
+        self.cout_ingredients.valeur.setText(
+            f"{cout_ingredients:,.0f} Ar"
+        )
+
         self.resultat.valeur.setText(
             f"{resultat:,.0f} Ar"
         )
@@ -952,37 +1018,39 @@ class RapportsPage(QWidget):
                 unite,
                 seuil
             ]
- 
-        for colonne, valeur in enumerate(valeurs):
 
-            item = QTableWidgetItem(
-                str(valeur)
-            )
+            for colonne, valeur in enumerate(valeurs):
 
-            self.table_stock_jour.setItem(
-                ligne,
-                colonne,
-                item
-            )
-
-        # Alerte stock faible
-        if quantite <= seuil:
-
-            for colonne in range(5):
-
-                item = self.table_stock_jour.item(
-                    ligne,
-                    colonne
+                item = QTableWidgetItem(
+                    str(valeur)
                 )
 
-                if item:
-                    item.setText(
-                        "⚠️ " + item.text()
+                self.table_stock_jour.setItem(
+                    ligne,
+                    colonne,
+                    item
+                )
+
+            # Alerte stock faible
+            if quantite <= seuil:
+
+                for colonne in range(5):
+
+                    item = self.table_stock_jour.item(
+                        ligne,
+                        colonne
                     )
 
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
+                    if item:
+
+                        item.setText(
+                            "⚠️ " + item.text()
+                        )
+
+                        font = item.font()
+                        font.setBold(True)
+
+                        item.setFont(font)
 
         # ==========================
         # Affichage de l'historique

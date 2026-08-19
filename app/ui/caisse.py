@@ -533,10 +533,14 @@ class CaissePage(QWidget):
                     INSERT INTO details_vente(
                         vente_id,
                         plat,
+                        plat_id,
+                        type_plat,
                         quantite,
                         prix
                     )
                     VALUES(
+                        ?,
+                        ?,
                         ?,
                         ?,
                         ?,
@@ -545,6 +549,8 @@ class CaissePage(QWidget):
                 """, (
                     vente_id,
                     infos["nom"],
+                    infos["id"],
+                    infos["type"],
                     infos["quantite"],
                     infos["prix"]
                 ))
