@@ -253,7 +253,8 @@ class StockPage(QWidget):
                     stock.nom,
                     stock_plats_du_jour.quantite,
                     stock.unite,
-                    stock_plats_du_jour.seuil
+                    stock_plats_du_jour.seuil,
+                    stock.prix_achat
                 FROM stock_plats_du_jour
 
                 JOIN plats_du_jour
@@ -274,7 +275,7 @@ class StockPage(QWidget):
 
             produits = cur.fetchall()
 
-            self.table.setColumnCount(6)
+            self.table.setColumnCount(7)
 
             self.table.setHorizontalHeaderLabels([
                 "ID",
@@ -782,6 +783,7 @@ class StockPage(QWidget):
                 self.produit_du_jour.currentData(),
                 quantite,
                 seuil,
+                self.id_selectionne
             ))
 
             conn.commit()

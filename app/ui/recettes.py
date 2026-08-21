@@ -102,6 +102,20 @@ class RecettesPage(QWidget):
             self.selectionner_recette
         )
 
+        self.label_cout_total = QLabel(
+            "💰 Coût total des ingrédients : 0.00 Ar"
+        )
+
+        self.label_cout_total.setStyleSheet("""
+            font-size:18px;
+            font-weight:bold;
+            padding:10px;
+        """)
+
+        layout.addWidget(
+            self.label_cout_total
+        )
+
         layout.addWidget(self.table)
         boutons = QHBoxLayout()
 
@@ -347,11 +361,13 @@ class RecettesPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
-        self.table.setColumnCount(2)
+        self.table.setColumnCount(4)
 
         self.table.setHorizontalHeaderLabels([
             "Ingrédient",
-            "Quantité"
+            "Quantité utilisée",
+            "Prix unitaire (Ar)",
+            "Coût (Ar)"
         ])
 
         # ==========================
@@ -365,7 +381,8 @@ class RecettesPage(QWidget):
                     recettes.id,
                     recettes.stock_id,
                     stock.nom,
-                    recettes.quantite
+                    recettes.quantite,
+                    stock.prix_achat
                 FROM recettes
                 JOIN stock
                     ON recettes.stock_id = stock.id
@@ -386,7 +403,8 @@ class RecettesPage(QWidget):
                     recettes_plats_du_jour.id,
                     recettes_plats_du_jour.stock_id,
                     stock.nom,
-                    recettes_plats_du_jour.quantite
+                    recettes_plats_du_jour.quantite,
+                    stock.prix_achat
                 FROM recettes_plats_du_jour
                 JOIN stock
                     ON recettes_plats_du_jour.stock_id = stock.id
@@ -404,22 +422,48 @@ class RecettesPage(QWidget):
 
         for ligne, recette in enumerate(recettes):
 
+            # Données de la recette
+            nom_ingredient = recette[2]
+            quantite = float(recette[3])
+            prix_unitaire = float(recette[4] or 0)
+
+            # Calcul du coût de l'ingrédient
+            cout = quantite * prix_unitaire
+
             # Nom de l'ingrédient
             self.table.setItem(
                 ligne,
                 0,
-                QTableWidgetItem(recette[2])
+                QTableWidgetItem(nom_ingredient)
             )
 
-            # Quantité
+            # Quantité utilisée
             self.table.setItem(
                 ligne,
                 1,
                 QTableWidgetItem(
-                    str(recette[3])
+                    str(quantite)
                 )
             )
-     
+
+            # Prix unitaire
+            self.table.setItem(
+                ligne,
+                2,
+                QTableWidgetItem(
+                    f"{prix_unitaire:.2f}"
+                )
+            )
+
+            # Coût
+            self.table.setItem(
+                ligne,
+                3,
+                QTableWidgetItem(
+                    f"{cout:.2f}"
+                )
+            )
+
             # ID de la recette
             self.table.item(
                 ligne,
@@ -436,6 +480,23 @@ class RecettesPage(QWidget):
             ).setData(
                 1001,
                 recette[1]
+            )
+
+            # ==========================
+            # COÛT TOTAL DE LA RECETTE
+            # ==========================
+
+            cout_total = 0
+
+            for recette in recettes:
+                quantite = float(recette[3])
+                prix_unitaire = float(recette[4] or 0)
+
+                cout_total += quantite * prix_unitaire
+
+            # Affichage du coût total
+            self.label_cout_total.setText(
+                f"💰 Coût total des ingrédients : {cout_total:.2f} Ar"       
             )
 
         conn.close()
