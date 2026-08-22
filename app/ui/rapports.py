@@ -714,6 +714,7 @@ class RapportsPage(QWidget):
 
         resultat = (
             chiffre_affaires
+            - cout_ingredients
             - total_depenses
         )
 
