@@ -603,7 +603,7 @@ class StockPage(QWidget):
                     plat_du_jour_id,
                     stock_id,
                     quantite,
-                    seuil,
+                    seuil
                 )
                 VALUES(?,?,?,?)
             """, (

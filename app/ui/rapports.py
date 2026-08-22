@@ -127,11 +127,14 @@ class RapportsPage(QWidget):
 
         self.table_plats = QTableWidget()
 
-        self.table_plats.setColumnCount(2)
+        self.table_plats.setColumnCount(5)
 
         self.table_plats.setHorizontalHeaderLabels([
             "Plat",
-            "Quantité vendue"
+            "Quantité vendue",
+            "Chiffre d'affaires",
+            "Coût ingrédients",
+            "Marge"
         ])
 
         self.table_plats.horizontalHeader().setSectionResizeMode(
@@ -734,18 +737,72 @@ class RapportsPage(QWidget):
             panier_moyen = 0
 
         # ==========================
-        # Plats les plus vendus
+        # Rentabilité des plats
         # ==========================
 
         cur.execute(f"""
             SELECT
                 details_vente.plat,
-                SUM(details_vente.quantite) AS quantite_totale
+
+                -- Quantité réellement vendue
+                SUM(details_vente.quantite) AS quantite_totale,
+
+                -- Chiffre d'affaires réellement réalisé
+                SUM(
+                    details_vente.quantite * details_vente.prix
+                ) AS chiffre_affaires,
+
+                -- Coût des ingrédients
+                SUM(
+                    details_vente.quantite *
+                    CASE
+                        WHEN details_vente.type_plat = 'habituel'
+                        THEN COALESCE(
+                            (
+                                SELECT SUM(
+                                    recettes.quantite * stock.prix_achat
+                                )
+                                FROM recettes
+                                JOIN stock
+                                    ON recettes.stock_id = stock.id
+                                WHERE recettes.plat_id = details_vente.plat_id
+                            ),
+                            0
+                        )
+
+                        WHEN details_vente.type_plat = 'jour'
+                        THEN COALESCE(
+                            (
+                                SELECT SUM(
+                                    recettes_plats_du_jour.quantite
+                                    * stock.prix_achat
+                                )
+                                FROM recettes_plats_du_jour
+                                JOIN stock
+                                    ON recettes_plats_du_jour.stock_id =
+                                        stock.id
+                                WHERE recettes_plats_du_jour.plat_du_jour_id =
+                                        details_vente.plat_id
+                            ),
+                            0
+                        )
+
+                        ELSE 0
+                    END
+                ) AS cout_ingredients
+
             FROM details_vente
+
             JOIN ventes
                 ON details_vente.vente_id = ventes.id
+
             WHERE {condition}
-            GROUP BY details_vente.plat
+
+            GROUP BY
+                details_vente.plat,
+                details_vente.plat_id,
+                details_vente.type_plat
+
             ORDER BY quantite_totale DESC
         """)
 
@@ -929,6 +986,7 @@ class RapportsPage(QWidget):
 
         for ligne, plat in enumerate(plats_vendus):
 
+            # Plat
             self.table_plats.setItem(
                 ligne,
                 0,
@@ -937,11 +995,41 @@ class RapportsPage(QWidget):
                 )
             )
 
+            # Quantité vendue
             self.table_plats.setItem(
                 ligne,
                 1,
                 QTableWidgetItem(
                     str(plat[1])
+                )
+            )
+
+            # Chiffre d'affaires
+            self.table_plats.setItem(
+                ligne,
+                2,
+                QTableWidgetItem(
+                    f"{plat[2]:,.0f} Ar"
+                )
+            )
+
+            # Coût des ingrédients
+            self.table_plats.setItem(
+                ligne,
+                3,
+                QTableWidgetItem(
+                    f"{plat[3]:,.0f} Ar"
+                )
+            )
+
+            # Marge
+            marge_plat = plat[2] - plat[3]
+
+            self.table_plats.setItem(
+                ligne,
+                4,
+                QTableWidgetItem(
+                    f"{marge_plat:,.0f} Ar"
                 )
             )
 
