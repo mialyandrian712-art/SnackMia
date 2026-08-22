@@ -116,6 +116,42 @@ class RecettesPage(QWidget):
             self.label_cout_total
         )
 
+        # ==========================
+        # PRIX DE VENTE
+        # ==========================
+
+        self.label_prix_vente = QLabel(
+            "💵 Prix de vente : 0.00 Ar"
+        )
+
+        self.label_prix_vente.setStyleSheet("""
+            font-size:18px;
+            font-weight:bold;
+            padding:5px;
+        """)
+
+        layout.addWidget(
+            self.label_prix_vente
+        )
+
+        # ==========================
+        # MARGE BRUTE
+        # ==========================
+
+        self.label_marge = QLabel(
+            "📈 Marge brute : 0.00 Ar"
+        )
+
+        self.label_marge.setStyleSheet("""
+            font-size:18px;
+            font-weight:bold;
+            padding:5px;
+        """)
+
+        layout.addWidget(
+            self.label_marge
+        )
+
         layout.addWidget(self.table)
         boutons = QHBoxLayout()
 
@@ -482,22 +518,67 @@ class RecettesPage(QWidget):
                 recette[1]
             )
 
-            # ==========================
-            # COÛT TOTAL DE LA RECETTE
-            # ==========================
+        # ==========================
+        # COÛT TOTAL DE LA RECETTE
+        # ==========================
 
-            cout_total = 0
+        cout_total = 0
 
-            for recette in recettes:
-                quantite = float(recette[3])
-                prix_unitaire = float(recette[4] or 0)
+        for recette in recettes:
+            quantite = float(recette[3])
+            prix_unitaire = float(recette[4] or 0)
 
-                cout_total += quantite * prix_unitaire
+            cout_total += quantite * prix_unitaire
 
-            # Affichage du coût total
-            self.label_cout_total.setText(
-                f"💰 Coût total des ingrédients : {cout_total:.2f} Ar"       
-            )
+        # Affichage du coût total
+        self.label_cout_total.setText(
+            f"💰 Coût total des ingrédients : {cout_total:.2f} Ar"       
+        )
+
+        # ==========================
+        # PRIX DE VENTE DU PLAT
+        # ==========================
+
+        prix_vente = 0
+
+        if self.type_recette.currentIndex() == 0:
+
+            cur.execute("""
+                SELECT prix
+                FROM plats
+                WHERE id = ?
+            """, (
+            self.plat.currentData(),
+        ))
+
+        else:
+
+            cur.execute("""
+                SELECT prix
+                FROM plats_du_jour
+                WHERE id = ?
+            """, (
+                self.plat.currentData(),
+            ))
+
+        resultat_prix = cur.fetchone()
+
+        if resultat_prix:
+            prix_vente = float(resultat_prix[0] or 0)
+
+        self.label_prix_vente.setText(
+            f"💵 Prix de vente : {prix_vente:,.0f} Ar"
+        )
+
+        # ==========================
+        # MARGE BRUTE
+        # ==========================
+
+        marge = prix_vente - cout_total
+
+        self.label_marge.setText(
+            f"📈 Marge brute : {marge:,.0f} Ar"
+        )
 
         conn.close()
 
