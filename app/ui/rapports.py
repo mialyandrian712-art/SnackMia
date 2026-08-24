@@ -165,13 +165,15 @@ class RapportsPage(QWidget):
 
         self.table_stock = QTableWidget()
 
-        self.table_stock.setColumnCount(4)
+        self.table_stock.setColumnCount(6)
 
         self.table_stock.setHorizontalHeaderLabels([
             "Produit",
             "Quantité",
             "Unité",
-            "Seuil"
+            "Seuil",
+            "Prix d'achat",
+            "Valeur du stock"
         ])
 
         self.table_stock.horizontalHeader().setSectionResizeMode(
@@ -200,14 +202,16 @@ class RapportsPage(QWidget):
 
         self.table_stock_jour = QTableWidget()
 
-        self.table_stock_jour.setColumnCount(5)
+        self.table_stock_jour.setColumnCount(7)
 
         self.table_stock_jour.setHorizontalHeaderLabels([
             "Plat du jour",
             "Produit",
             "Quantité",
             "Unité",
-            "Seuil"
+            "Seuil",
+            "Prix d'achat",
+            "Valeur du stock"
         ])
 
         self.table_stock_jour.horizontalHeader().setSectionResizeMode(
@@ -250,10 +254,11 @@ class RapportsPage(QWidget):
 
         self.table_historique = QTableWidget()
 
-        self.table_historique.setColumnCount(5)
+        self.table_historique.setColumnCount(6)
 
         self.table_historique.setHorizontalHeaderLabels([
             "Date",
+            "Type",
             "Plat",
             "Quantité",
             "Prix",
@@ -819,6 +824,7 @@ class RapportsPage(QWidget):
             cur.execute(f"""
                 SELECT
                     ventes.date_vente,
+                    details_vente.type_plat,
                     details_vente.plat,
                     details_vente.quantite,
                     details_vente.prix,
@@ -838,6 +844,7 @@ class RapportsPage(QWidget):
             cur.execute(f"""
                 SELECT
                     ventes.date_vente,
+                    details_vente.type_plat,
                     details_vente.plat,
                     details_vente.quantite,
                     details_vente.prix,
@@ -916,7 +923,8 @@ class RapportsPage(QWidget):
                 nom,
                 quantite,
                 unite,
-                seuil
+                seuil,
+                prix_achat
             FROM stock
             ORDER BY quantite ASC
         """)
@@ -933,7 +941,8 @@ class RapportsPage(QWidget):
                 stock.nom,
                 stock_plats_du_jour.quantite,
                 stock.unite,
-                stock_plats_du_jour.seuil
+                stock_plats_du_jour.seuil,
+                stock.prix_achat
             FROM stock_plats_du_jour
             JOIN plats_du_jour
                 ON stock_plats_du_jour.plat_du_jour_id
@@ -1043,13 +1052,17 @@ class RapportsPage(QWidget):
 
         for ligne, produit in enumerate(stock):
 
-            nom, quantite, unite, seuil = produit
+            nom, quantite, unite, seuil, prix_achat = produit
+
+            valeur_stock = quantite * prix_achat
 
             valeurs = [
                 nom,
                 quantite,
                 unite,
-                seuil
+                seuil,
+                f"{prix_achat:,.0f} Ar",
+                f"{valeur_stock:,.0f} Ar"
             ]
 
             for colonne, valeur in enumerate(valeurs):
@@ -1068,9 +1081,9 @@ class RapportsPage(QWidget):
             # Alerte stock faible
             # ==========================
 
-            if quantite <= seuil:
+            if seuil > 0 and quantite <= seuil:
 
-                for colonne in range(4):
+                for colonne in range(6):
 
                     item = self.table_stock.item(
                         ligne,
@@ -1098,14 +1111,18 @@ class RapportsPage(QWidget):
 
         for ligne, produit in enumerate(stock_jour):
 
-            plat, nom, quantite, unite, seuil = produit
+            plat, nom, quantite, unite, seuil, prix_achat = produit
+
+            valeur_stock = quantite * prix_achat
 
             valeurs = [
                 plat,
                 nom,
                 quantite,
                 unite,
-                seuil
+                seuil,
+                f"{prix_achat:,.0f} Ar",
+                f"{valeur_stock:,.0f} Ar"
             ]
 
             for colonne, valeur in enumerate(valeurs):
@@ -1121,9 +1138,9 @@ class RapportsPage(QWidget):
                 )
 
             # Alerte stock faible
-            if quantite <= seuil:
+            if seuil > 0 and quantite <= seuil:
 
-                for colonne in range(5):
+                for colonne in range(7):
 
                     item = self.table_stock_jour.item(
                         ligne,
@@ -1150,7 +1167,14 @@ class RapportsPage(QWidget):
         )
 
         for ligne, vente in enumerate(historique):
+            
+            vente = list(vente)
 
+            if vente[1] == "habituel":
+                vente[1] = "📋 Habituel"
+            else:
+                vente[1] = "⭐ Jour"
+            
             for colonne, valeur in enumerate(vente):
 
                 self.table_historique.setItem(
