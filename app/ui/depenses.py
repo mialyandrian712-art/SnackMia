@@ -9,8 +9,11 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView
+    QHeaderView,
+    QDateEdit
 )
+
+from PySide6.QtCore import QDate
 
 from app.database.database import get_connection
 
@@ -36,6 +39,91 @@ class DepensesPage(QWidget):
         """)
 
         layout.addWidget(titre)
+
+        # ==========================
+        # Filtres
+        # ==========================
+
+        filtres = QHBoxLayout()
+
+        self.periode = QComboBox()
+
+        self.periode.addItems([
+            "Toutes",
+            "Aujourd'hui",
+            "Hier",
+            "Cette semaine",
+            "La semaine dernière",
+            "Ce mois",
+            "Le mois dernier",
+            "Cette année"
+        ])
+
+        filtres.addWidget(
+            QLabel("Période :")
+        )
+
+        filtres.addWidget(
+            self.periode
+        )
+
+        self.date_precise = QDateEdit()
+        self.date_precise.setCalendarPopup(True)
+        self.date_precise.setDate(
+            QDate.currentDate()
+        )
+        self.btn_date = QPushButton("🔎 Date précise")
+
+        filtres.addWidget(
+            QLabel("Date précise :")
+        )
+
+        filtres.addWidget(
+            self.date_precise
+        )
+
+        filtres.addWidget(
+            self.btn_date
+        )
+
+        self.recherche = QLineEdit()
+        self.recherche.setPlaceholderText(
+            "🔎 Rechercher une dépense..."
+        )
+
+        filtres.addWidget(
+            self.recherche
+        )
+
+        layout.addLayout(filtres)
+
+        filtres_categorie = QHBoxLayout()
+
+        self.filtre_categorie = QComboBox()
+
+        self.filtre_categorie.addItems([
+            "Toutes",
+            "Matières premières",
+            "Transport",
+            "Électricité",
+            "Eau",
+            "Loyer",
+            "Salaires",
+            "Entretien",
+            "Autre"
+        ])
+
+        filtres_categorie.addWidget(
+            QLabel("Catégorie :")
+        )
+
+        filtres_categorie.addWidget(
+            self.filtre_categorie
+        )
+
+        layout.addLayout(
+            filtres_categorie
+        )
 
         # ==========================
         # Tableau
@@ -127,6 +215,22 @@ class DepensesPage(QWidget):
         # ==========================
         # Connexions
         # ==========================
+        
+        self.btn_date.clicked.connect(
+            self.rechercher_par_date
+        )
+
+        self.periode.currentTextChanged.connect(
+            self.charger_depenses
+        )
+
+        self.filtre_categorie.currentTextChanged.connect(
+            self.charger_depenses
+        )
+
+        self.recherche.textChanged.connect(
+            self.charger_depenses
+        )
 
         self.btn_ajouter.clicked.connect(
             self.ajouter_depense
@@ -151,7 +255,100 @@ class DepensesPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
-        cur.execute("""
+        conditions = []
+        parametres = []
+
+        # ==========================
+        # Filtre de période
+        # ==========================
+
+        periode = self.periode.currentText()
+
+        if periode == "Aujourd'hui":
+            conditions.append(
+                "date(date_depense) = date('now', 'localtime')"
+            )
+
+        elif periode == "Hier":
+            conditions.append(
+                "date(date_depense) = date('now', 'localtime', '-1 day')"
+            )
+
+        elif periode == "Cette semaine":
+            conditions.append("""
+                date(date_depense) >= date(
+                    'now',
+                    '-' || ((strftime('%w', 'now') + 6) % 7)
+                    || ' days',
+                    'localtime'
+                )
+            """)
+
+        elif periode == "La semaine dernière":
+            conditions.append("""
+                date(date_depense) >= date(
+                    'now',
+                    '-' || ((strftime('%w', 'now') + 6) % 7 + 7)
+                    || ' days',
+                    'localtime'
+                )
+                AND date(date_depense) < date(
+                    'now',
+                    '-' || ((strftime('%w', 'now') + 6) % 7)
+                    || ' days',
+                    'localtime'
+                )
+            """)
+
+        elif periode == "Ce mois":
+            conditions.append("""
+                strftime('%Y-%m', date_depense)
+                = strftime('%Y-%m', 'now', 'localtime')
+            """)
+
+        elif periode == "Le mois dernier":
+            conditions.append("""
+                strftime('%Y-%m', date_depense)
+                = strftime('%Y-%m', 'now', 'localtime', '-1 month')
+            """)
+
+        elif periode == "Cette année":
+            conditions.append("""
+                strftime('%Y', date_depense)
+                = strftime('%Y', 'now', 'localtime')
+            """)
+
+        # ==========================
+        # Catégorie
+        # ==========================
+
+        categorie = self.filtre_categorie.currentText()
+
+        if categorie != "Toutes":
+            conditions.append(
+                "categorie = ?"
+            )
+            parametres.append(categorie)
+
+        # ==========================
+        # Recherche
+        # ==========================
+
+        recherche = self.recherche.text().strip()
+
+        if recherche:
+            conditions.append(
+                "libelle LIKE ?"
+            )
+            parametres.append(
+                f"%{recherche}%"
+            )
+
+        # ==========================
+        # Requête
+        # ==========================
+
+        requete = """
             SELECT
                 id,
                 date_depense,
@@ -159,8 +356,19 @@ class DepensesPage(QWidget):
                 categorie,
                 montant
             FROM depenses
+        """
+
+        if conditions:
+            requete += " WHERE " + " AND ".join(conditions)
+
+        requete += """
             ORDER BY date_depense DESC
-        """)
+        """
+
+        cur.execute(
+            requete,
+            parametres
+        )
 
         depenses = cur.fetchall()
 
@@ -404,3 +612,46 @@ class DepensesPage(QWidget):
             "Succès",
             "Dépense supprimée."
         )
+
+    def rechercher_par_date(self):
+
+        date_precise = self.date_precise.date().toString(
+            "yyyy-MM-dd"
+        )
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT
+                id,
+                date_depense,
+                libelle,
+                categorie,
+                montant
+            FROM depenses
+            WHERE date(date_depense) = ?
+            ORDER BY date_depense DESC
+        """, (
+            date_precise,
+        ))
+
+        depenses = cur.fetchall()
+
+        conn.close()
+
+        self.table.setRowCount(
+            len(depenses)
+        )
+
+        for ligne, depense in enumerate(depenses):
+
+            for colonne, valeur in enumerate(depense):
+
+                self.table.setItem(
+                    ligne,
+                    colonne,
+                    QTableWidgetItem(
+                        str(valeur)
+                    )
+                )    
