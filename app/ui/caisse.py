@@ -39,6 +39,124 @@ class CaissePage(QWidget):
 
         gauche_layout.addWidget(titre)
 
+        # ==========================
+        # CATÉGORIES
+        # ==========================
+
+        self.categories = QHBoxLayout()
+        self.sous_categories = QHBoxLayout()
+
+        self.btn_tous = QPushButton("Tous")
+        self.btn_viandes = QPushButton("🥩 Viandes")
+        self.btn_riz = QPushButton("🍚 Riz")
+        self.btn_minesao = QPushButton("🍜 Mine-sao")
+        self.btn_soupe = QPushButton("🍲 Soupe")
+        self.btn_gratin = QPushButton("🧀 Gratin")
+        self.btn_poutines = QPushButton("🍟 Poutines")
+        self.btn_burger = QPushButton("🍔 Burger")
+        self.btn_sandwich = QPushButton("🥪 Sandwich")
+        self.btn_pizza = QPushButton("🍕 Pizza")
+        self.btn_snack = QPushButton("🍿 Snack")
+        
+        self.btn_boissons = QPushButton("🥤 Boissons")
+        self.btn_plats_du_jour = QPushButton("⭐ Plats du jour")
+        self.btn_petit_dejeuner = QPushButton("🥐 Petit déjeuner")
+        self.btn_vitrine = QPushButton("🛍️ Vitrine")
+        self.btn_biscuits = QPushButton("🍪 Biscuits")
+
+        self.btn_tous.clicked.connect(
+            lambda: self.charger_produits()
+        )
+
+        self.btn_viandes.clicked.connect(
+            lambda: self.charger_produits("Viandes")
+        )
+
+        self.btn_riz.clicked.connect(
+            lambda: self.charger_produits("Riz")
+        )
+
+        self.btn_minesao.clicked.connect(
+            lambda: self.charger_produits("Mine-sao")
+        )
+
+        self.btn_soupe.clicked.connect(
+            lambda: self.charger_produits("Soupe")
+        )
+
+        self.btn_gratin.clicked.connect(
+            lambda: self.charger_produits("Gratin")
+        )
+
+        self.btn_poutines.clicked.connect(
+            lambda: self.charger_produits("Poutines")
+        )
+
+        self.btn_burger.clicked.connect(
+            lambda: self.charger_produits("Burger")
+        )
+
+        self.btn_sandwich.clicked.connect(
+            lambda: self.charger_produits("Sandwich")
+        )
+
+        self.btn_pizza.clicked.connect(
+            lambda: self.charger_produits("Pizza")
+        )
+
+        self.btn_snack.clicked.connect(
+            lambda: self.charger_produits("Snack")
+        )
+
+        self.btn_boissons.clicked.connect(
+            lambda: self.charger_produits("Boisson")
+        )
+
+        self.btn_petit_dejeuner.clicked.connect(
+            lambda: self.charger_produits("Petit déjeuner")
+        )
+
+        self.btn_vitrine.clicked.connect(
+            lambda: self.charger_produits("Vitrine")
+        )
+
+        self.btn_biscuits.clicked.connect(
+            lambda: self.charger_produits("Biscuits")
+        )
+
+        self.btn_plats_du_jour.clicked.connect(
+            lambda: self.charger_produits("Plat du jour")
+        )
+
+        # ==========================
+        # GRANDES SECTIONS
+        # ==========================
+
+        self.categories.addWidget(self.btn_tous)
+        self.categories.addWidget(self.btn_boissons)
+        self.categories.addWidget(self.btn_plats_du_jour)
+        self.categories.addWidget(self.btn_petit_dejeuner)
+        self.categories.addWidget(self.btn_vitrine)
+        self.categories.addWidget(self.btn_biscuits)
+
+        # ==========================
+        # SOUS-CATÉGORIES DES PLATS
+        # ==========================
+
+        self.sous_categories.addWidget(self.btn_viandes)
+        self.sous_categories.addWidget(self.btn_riz)
+        self.sous_categories.addWidget(self.btn_minesao)
+        self.sous_categories.addWidget(self.btn_soupe)
+        self.sous_categories.addWidget(self.btn_gratin)
+        self.sous_categories.addWidget(self.btn_poutines)
+        self.sous_categories.addWidget(self.btn_burger)
+        self.sous_categories.addWidget(self.btn_sandwich)
+        self.sous_categories.addWidget(self.btn_pizza)
+        self.sous_categories.addWidget(self.btn_snack)
+
+        gauche_layout.addLayout(self.categories)
+        gauche_layout.addLayout(self.sous_categories)
+
         self.liste_produits = QListWidget()
 
         self.panier = {}
@@ -152,80 +270,90 @@ class CaissePage(QWidget):
     # CHARGER LES PLATS HABITUELS + PLATS DU JOUR
     # =========================================================
 
-    def charger_produits(self):
+    def charger_produits(self, categorie=None):
 
         conn = get_connection()
         cur = conn.cursor()
 
         self.liste_produits.clear()
 
-        # ==========================
+        # =========================================================
         # PLATS HABITUELS
-        # ==========================
+        # =========================================================
 
-        item_titre = QListWidgetItem(
-            "🍔 PLATS HABITUELS"
-        )
+        if categorie is None:
 
-        item_titre.setFlags(
-            Qt.NoItemFlags
-        )
-
-        self.liste_produits.addItem(
-            item_titre
-        )
-
-        cur.execute("""
-            SELECT
-                id,
-                nom,
-                prix
-            FROM plats
-            WHERE disponible = 1
-            ORDER BY categorie, nom
-        """)
-
-        produits = cur.fetchall()
-
-        for plat_id, nom, prix in produits:
-
-            item = QListWidgetItem(
-                f"{nom} - {int(prix)} Ar"
+            item_titre = QListWidgetItem(
+                "🍔 PLATS HABITUELS"
             )
 
-            item.setData(
-                Qt.UserRole,
-                {
-                    "type": "habituel",
-                    "id": plat_id,
-                    "nom": nom,
-                    "prix": prix
-                }
+            item_titre.setFlags(
+                Qt.NoItemFlags
             )
 
             self.liste_produits.addItem(
-                item
+                item_titre
             )
 
-        # ==========================
+            cur.execute("""
+                SELECT
+                    id,
+                    nom,
+                    prix
+                FROM plats
+                WHERE disponible = 1
+                ORDER BY categorie, nom
+            """)
+
+        elif categorie in [
+            "Viandes",
+            "Riz",
+            "Mine-sao",
+            "Soupe",
+            "Gratin",
+            "Poutines",
+            "Burger",
+            "Sandwich",
+            "Pizza",
+            "Snack",
+            "Boisson",
+            "Petit déjeuner",
+            "Vitrine",
+            "Biscuits"
+        ]:
+
+            titre = "🥤 BOISSONS" if categorie == "Boisson" else "🍔 PLATS HABITUELS"
+
+            item_titre = QListWidgetItem(
+                titre
+            )
+
+            item_titre.setFlags(
+                Qt.NoItemFlags
+            )
+
+            self.liste_produits.addItem(
+                item_titre
+            )
+
+            cur.execute("""
+                SELECT
+                    id,
+                    nom,
+                    prix
+                FROM plats
+                WHERE disponible = 1
+                AND categorie = ?
+                ORDER BY nom
+            """, (
+                categorie,
+            ))
+
+        # =========================================================
         # PLATS DU JOUR
-        # ==========================
+        # =========================================================
 
-        cur.execute("""
-            SELECT
-                id,
-                nom,
-                prix
-            FROM plats_du_jour
-            WHERE disponible = 1
-            AND date_jour =
-                date('now', 'localtime')
-            ORDER BY nom
-        """)
-
-        plats_du_jour = cur.fetchall()
-
-        if plats_du_jour:
+        elif categorie == "Plat du jour":
 
             item_titre = QListWidgetItem(
                 "⭐ PLATS DU JOUR"
@@ -239,25 +367,50 @@ class CaissePage(QWidget):
                 item_titre
             )
 
-            for plat_id, nom, prix in plats_du_jour:
+            cur.execute("""
+                SELECT
+                    id,
+                    nom,
+                    prix
+                FROM plats_du_jour
+                WHERE disponible = 1
+                AND date_jour = date('now', 'localtime')
+                ORDER BY nom
+            """)
 
-                item = QListWidgetItem(
-                    f"{nom} - {int(prix)} Ar"
-                )
+        else:
+            conn.close()
+            return
 
-                item.setData(
-                    Qt.UserRole,
-                    {
-                        "type": "jour",
-                        "id": plat_id,
-                        "nom": nom,
-                        "prix": prix
-                    }
-                )
+        produits = cur.fetchall()
 
-                self.liste_produits.addItem(
-                    item
-                )
+        # =========================================================
+        # AFFICHAGE
+        # =========================================================
+
+        for plat_id, nom, prix in produits:
+
+            item = QListWidgetItem(
+                f"{nom} - {int(prix)} Ar"
+            )
+
+            item.setData(
+                Qt.UserRole,
+                {
+                    "type": (
+                        "jour"
+                        if categorie == "Plat du jour"
+                        else "habituel"
+                    ),
+                    "id": plat_id,
+                    "nom": nom,
+                    "prix": prix
+                }
+            )
+
+            self.liste_produits.addItem(
+                item
+            )
 
         conn.close()
 

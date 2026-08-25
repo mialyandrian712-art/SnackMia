@@ -68,16 +68,23 @@ class PlatsPage(QWidget):
         self.nom.setPlaceholderText("Nom du plat")
 
         self.categorie = QComboBox()
+        self.categorie.setMaxVisibleItems(14)
 
         self.categorie.addItems([
-            "Sandwich",
+            "Viandes",
+            "Riz",
+            "Mine-sao",
+            "Soupe",
+            "Gratin",
+            "Poutines",
             "Burger",
+            "Sandwich",
             "Pizza",
             "Snack",
-            "Apéritif",
-            "Plat",
-            "Dessert",
-            "Boisson"
+            "Boisson",
+            "Petit déjeuner",
+            "Vitrine",
+            "Biscuits"
         ])
 
         self.prix = QLineEdit()

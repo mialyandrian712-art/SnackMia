@@ -294,8 +294,7 @@ class PlatsDuJourPage(QWidget):
             INSERT INTO plats_du_jour(
                 date_jour,
                 nom,
-                prix,
-                disponible
+                prix
             )
             VALUES(?,?,?)
         """, (

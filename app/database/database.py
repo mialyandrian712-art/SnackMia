@@ -140,6 +140,14 @@ def update_database():
 
     try:
         cursor.execute("""
+            ALTER TABLE stock
+            ADD COLUMN type_stock TEXT DEFAULT 'ingredient'
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
             ALTER TABLE details_vente
             ADD COLUMN plat_id INTEGER DEFAULT 0
         """)

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 
 from app.database.database import get_connection
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 
 
 class Carte(QFrame):
@@ -69,6 +69,18 @@ class AccueilPage(QWidget):
         """)
 
         layout.addWidget(titre)
+
+        date_label = QLabel(
+            "📅 " + QDate.currentDate().toString("dd/MM/yyyy") + " — Données du jour"
+        )
+
+        date_label.setStyleSheet("""
+            font-size:16px;
+            color:gray;
+            padding-left:20px;
+        """)
+
+        layout.addWidget(date_label)
 
         grille = QGridLayout()
 
@@ -257,7 +269,8 @@ class AccueilPage(QWidget):
         cur.execute("""
             SELECT COUNT(*)
             FROM stock
-            WHERE quantite <= seuil
+            WHERE seuil > 0
+            AND quantite <= seuil
         """)
 
         nombre_alertes = cur.fetchone()[0]
@@ -272,7 +285,8 @@ class AccueilPage(QWidget):
                 quantite,
                 seuil
             FROM stock
-            WHERE quantite <= seuil
+            WHERE seuil > 0
+            AND quantite <= seuil
             ORDER BY quantite ASC
         """)
 

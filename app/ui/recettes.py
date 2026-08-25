@@ -38,7 +38,9 @@ class RecettesPage(QWidget):
 
         self.type_recette.addItems([
             "🍔 Plat habituel",
-            "⭐ Plat du jour"
+            "⭐ Plat du jour",
+            "🛍️ Vitrine",
+            "🥐 Petit déjeuner"
         ])
 
         layout.addWidget(
@@ -203,19 +205,47 @@ class RecettesPage(QWidget):
 
         if self.type_recette.currentIndex() == 0:
 
+            # 🍔 Plat habituel
             cur.execute("""
                 SELECT id, nom
                 FROM plats
+                WHERE categorie NOT IN (
+                    'Vitrine',
+                    'Petit déjeuner',
+                    'Boisson',
+                    'Biscuits'
+                )
                 ORDER BY nom
             """)
 
-        else:
+        elif self.type_recette.currentIndex() == 1:
 
+            # ⭐ Plat du jour
             cur.execute("""
                 SELECT id, nom
                 FROM plats_du_jour
                 WHERE disponible = 1
                 AND date_jour = date('now', 'localtime')
+                ORDER BY nom
+            """)
+
+        elif self.type_recette.currentIndex() == 2:
+
+            # 🛍️ Vitrine
+            cur.execute("""
+                SELECT id, nom
+                FROM plats
+                WHERE categorie = 'Vitrine'
+                ORDER BY nom
+            """)
+
+        elif self.type_recette.currentIndex() == 3:
+
+            # 🥐 Petit déjeuner
+            cur.execute("""
+                SELECT id, nom
+                FROM plats
+                WHERE categorie = 'Petit déjeuner'
                 ORDER BY nom
             """)
 
@@ -342,7 +372,7 @@ class RecettesPage(QWidget):
         # PLAT DU JOUR
         # ==========================
 
-        else:
+        elif self.type_recette.currentIndex() == 1:
 
             cur.execute("""
                 SELECT COUNT(*)
@@ -432,7 +462,7 @@ class RecettesPage(QWidget):
         # PLAT DU JOUR
         # ==========================
 
-        else:
+        elif self.type_recette.currentIndex() == 1:
 
             cur.execute("""
                 SELECT
@@ -541,21 +571,20 @@ class RecettesPage(QWidget):
 
         prix_vente = 0
 
-        if self.type_recette.currentIndex() == 0:
-
-            cur.execute("""
-                SELECT prix
-                FROM plats
-                WHERE id = ?
-            """, (
-            self.plat.currentData(),
-        ))
-
-        else:
-
+        if self.type_recette.currentIndex() == 1:
+            # ⭐ Plat du jour
             cur.execute("""
                 SELECT prix
                 FROM plats_du_jour
+                WHERE id = ?
+            """, (
+                self.plat.currentData(),
+            ))
+        else:
+            # 🍔 Plat habituel / 🛍️ Vitrine / 🥐 Petit déjeuner
+            cur.execute("""
+                SELECT prix
+                FROM plats
                 WHERE id = ?
             """, (
                 self.plat.currentData(),
