@@ -140,6 +140,38 @@ def update_database():
 
     try:
         cursor.execute("""
+            ALTER TABLE depenses
+            ADD COLUMN type_stock TEXT
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
+            ALTER TABLE depenses
+            ADD COLUMN produit_id INTEGER
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
+            ALTER TABLE depenses
+            ADD COLUMN quantite REAL
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
+            ALTER TABLE depenses
+            ADD COLUMN prix_unitaire REAL
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("""
             ALTER TABLE stock
             ADD COLUMN type_stock TEXT DEFAULT 'ingredient'
         """)

@@ -31,7 +31,9 @@ class StockPage(QWidget):
         self.type_stock = QComboBox()
 
         self.type_stock.addItems([
-            "📦 Stock habituel",
+            "🧂 Stock ingrédients",
+            "🥤 Stock boissons",
+            "🍪 Stock biscuits",
             "⭐ Stock du jour"
         ])
 
@@ -173,11 +175,18 @@ class StockPage(QWidget):
         self.table.clearSpans()
 
         # ==========================
-        # STOCK HABITUEL
+        # STOCK INGREDIENTS / BOISSONS / BISCUITS
         # ==========================
 
-        if self.type_stock.currentIndex() == 0:
+        if self.type_stock.currentIndex() in (0, 1, 2):
 
+            if self.type_stock.currentIndex() == 0:
+                type_filtre = "ingredient"
+            elif self.type_stock.currentIndex() == 1:
+                type_filtre = "boisson"
+            else:
+                type_filtre = "biscuit"
+            
             cur.execute("""
                 SELECT
                     id,
@@ -187,8 +196,11 @@ class StockPage(QWidget):
                     seuil,
                     prix_achat
                 FROM stock
+                WHERE type_stock = ?
                 ORDER BY nom
-            """)
+            """, (
+                type_filtre,
+            ))
 
             produits = cur.fetchall()
 
@@ -244,7 +256,7 @@ class StockPage(QWidget):
         # STOCK DU JOUR
         # ==========================
 
-        else:
+        elif self.type_stock.currentIndex() == 3:
 
             cur.execute("""
                 SELECT
@@ -518,7 +530,7 @@ class StockPage(QWidget):
         # STOCK DU JOUR
         # ==========================
 
-        if self.type_stock.currentIndex() == 1:
+        if self.type_stock.currentIndex() == 3:
 
             if self.plat_du_jour.currentData() is None:
                 conn.close()
@@ -671,21 +683,31 @@ class StockPage(QWidget):
             )
             return
 
+        # Déterminer le type de stock
+        if self.type_stock.currentIndex() == 0:
+            type_stock = "ingredient"
+        elif self.type_stock.currentIndex() == 1:
+            type_stock = "boisson"
+        else:
+            type_stock = "biscuit"
+
         cur.execute("""
             INSERT INTO stock(
                 nom,
                 quantite,
                 unite,
                 seuil,
-                prix_achat
+                prix_achat,
+                type_stock
             )
-            VALUES(?,?,?,?,?)
+            VALUES(?,?,?,?,?,?)
         """, (
             self.nom.text(),
             quantite,
             self.unite.currentText(),
             seuil,
-            prix_achat
+            prix_achat,
+            type_stock
         ))
 
         conn.commit()
@@ -724,7 +746,7 @@ class StockPage(QWidget):
         # STOCK DU JOUR
         # ==========================
 
-        if self.type_stock.currentIndex() == 1:
+        if self.type_stock.currentIndex() == 3:
 
             if self.plat_du_jour.currentData() is None:
                 conn.close()
@@ -841,6 +863,14 @@ class StockPage(QWidget):
 
             return
 
+        # Déterminer le type de stock
+        if self.type_stock.currentIndex() == 0:
+            type_stock = "ingredient"
+        elif self.type_stock.currentIndex() == 1:
+            type_stock = "boisson"
+        else:
+            type_stock = "biscuit"
+
         cur.execute("""
             UPDATE stock
             SET
@@ -848,7 +878,8 @@ class StockPage(QWidget):
                 quantite = ?,
                 unite = ?,
                 seuil = ?,
-                prix_achat = ?
+                prix_achat = ?,
+                type_stock = ?
             WHERE id = ?
         """, (
             self.nom.text(),
@@ -856,6 +887,7 @@ class StockPage(QWidget):
             self.unite.currentText(),
             seuil,
             prix_achat,
+            type_stock,
             self.id_selectionne
         ))
 
@@ -900,7 +932,7 @@ class StockPage(QWidget):
         # STOCK DU JOUR
         # ==========================
 
-        if self.type_stock.currentIndex() == 1:
+        if self.type_stock.currentIndex() == 3:
 
             cur.execute("""
                 DELETE FROM stock_plats_du_jour
@@ -959,7 +991,7 @@ class StockPage(QWidget):
     def changer_type_stock(self):
 
         est_stock_du_jour = (
-            self.type_stock.currentIndex() == 1
+            self.type_stock.currentIndex() == 3
         )
 
         # Plat du jour

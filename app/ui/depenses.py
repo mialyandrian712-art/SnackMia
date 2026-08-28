@@ -131,13 +131,17 @@ class DepensesPage(QWidget):
 
         self.table = QTableWidget()
 
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(9)
 
         self.table.setHorizontalHeaderLabels([
             "ID",
             "Date",
             "Libellé",
             "Catégorie",
+            "Type de stock",
+            "Produit",
+            "Quantité",
+            "Prix unitaire (Ar)",
             "Montant (Ar)"
         ])
 
@@ -167,7 +171,7 @@ class DepensesPage(QWidget):
         self.categorie = QComboBox()
 
         self.categorie.addItems([
-            "Matières premières",
+            "🛒 Achat stock",
             "Transport",
             "Électricité",
             "Eau",
@@ -177,6 +181,52 @@ class DepensesPage(QWidget):
             "Autre"
         ])
 
+        # ==========================
+        # Informations achat stock
+        # ==========================
+
+        self.type_stock_achat = QComboBox()
+
+        self.type_stock_achat.addItems([
+            "🧂 Ingrédient",
+            "🥤 Boisson",
+            "🍪 Biscuit"
+        ])
+
+        self.label_type_stock_achat = QLabel("Type de stock")
+
+        self.produit_achat = QComboBox()
+
+        self.label_produit_achat = QLabel("Produit")
+
+        self.quantite_achat = QLineEdit()
+        self.quantite_achat.setPlaceholderText(
+            "Quantité achetée"
+        )
+
+        self.prix_unitaire_achat = QLineEdit()
+        self.prix_unitaire_achat.setPlaceholderText(
+            "Prix d'achat unitaire (Ar)"
+        )
+
+        self.total_achat = QLineEdit()
+        self.total_achat.setPlaceholderText(
+            "Total (Ar)"
+        )
+
+        self.total_achat.setReadOnly(True)
+
+        layout.addWidget(self.label_type_stock_achat)
+        layout.addWidget(self.type_stock_achat)
+
+        layout.addWidget(self.label_produit_achat)
+        layout.addWidget(self.produit_achat)
+
+        layout.addWidget(self.quantite_achat)
+        layout.addWidget(self.prix_unitaire_achat)
+        layout.addWidget(self.total_achat)
+
+        # Montant de la dépense normale
         self.montant = QLineEdit()
         self.montant.setPlaceholderText(
             "Montant en Ariary"
@@ -232,9 +282,27 @@ class DepensesPage(QWidget):
             self.charger_depenses
         )
 
+        self.categorie.currentTextChanged.connect(
+            self.changer_formulaire_depense
+        )
+
+        self.type_stock_achat.currentIndexChanged.connect(
+            self.charger_produits_achat
+        )
+
+        self.quantite_achat.textChanged.connect(
+            self.calculer_total_achat
+        )
+
+        self.prix_unitaire_achat.textChanged.connect(
+            self.calculer_total_achat
+        )
+
         self.btn_ajouter.clicked.connect(
             self.ajouter_depense
         )
+
+        self.changer_formulaire_depense()
 
         self.btn_modifier.clicked.connect(
             self.modifier_depense
@@ -350,12 +418,18 @@ class DepensesPage(QWidget):
 
         requete = """
             SELECT
-                id,
-                date_depense,
-                libelle,
-                categorie,
-                montant
+                depenses.id,
+                depenses.date_depense,
+                depenses.libelle,
+                depenses.categorie,
+                depenses.type_stock,
+                stock.nom,
+                depenses.quantite,
+                depenses.prix_unitaire,
+                depenses.montant
             FROM depenses
+            LEFT JOIN stock
+                ON depenses.produit_id = stock.id
         """
 
         if conditions:
@@ -379,6 +453,9 @@ class DepensesPage(QWidget):
         for ligne, depense in enumerate(depenses):
 
             for colonne, valeur in enumerate(depense):
+
+                if valeur is None:
+                    valeur = ""
 
                 self.table.setItem(
                     ligne,
@@ -433,6 +510,163 @@ class DepensesPage(QWidget):
     # ==========================
 
     def ajouter_depense(self):
+
+        achat_stock = (
+            self.categorie.currentText()
+            == "🛒 Achat stock"
+        )
+
+        # ==========================
+        # ACHAT DE STOCK
+        # ==========================
+
+        if achat_stock:
+
+            if (
+                self.produit_achat.currentData() is None
+                or self.quantite_achat.text().strip() == ""
+                or self.prix_unitaire_achat.text().strip() == ""
+            ):
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "Sélectionne un produit et remplis la quantité ainsi que le prix d'achat."
+                )
+
+                return
+
+            try:
+
+                quantite = float(
+                    self.quantite_achat.text()
+                )
+
+                prix_unitaire = float(
+                    self.prix_unitaire_achat.text()
+                )
+
+            except ValueError:
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "La quantité et le prix d'achat doivent être des nombres."
+                )
+
+                return
+
+            if quantite <= 0 or prix_unitaire < 0:
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "La quantité doit être supérieure à 0 et le prix ne peut pas être négatif."
+                )
+
+                return
+
+            produit_id = (
+                self.produit_achat.currentData()
+            )
+
+            nom_produit = (
+                self.produit_achat.currentText()
+            )
+
+            total = (
+                quantite
+                * prix_unitaire
+            )
+
+            conn = get_connection()
+            cur = conn.cursor()
+
+            # ==========================
+            # Ajouter la dépense
+            # ==========================
+
+            # Déterminer le type de stock
+            if self.type_stock_achat.currentIndex() == 0:
+                type_stock = "ingredient"
+            elif self.type_stock_achat.currentIndex() == 1:
+                type_stock = "boisson"
+            else:
+                type_stock = "biscuit"    
+
+            cur.execute("""
+                INSERT INTO depenses(
+                    date_depense,
+                    libelle,
+                    categorie,
+                    montant,
+                    type_stock,
+                    produit_id,
+                    quantite,
+                    prix_unitaire
+                )
+                VALUES(
+                    datetime('now'),
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
+            """, (
+                f"Achat stock - {nom_produit}",
+                "🛒 Achat stock",
+                total,
+                type_stock,
+                produit_id,
+                quantite,
+                prix_unitaire
+            ))
+
+            # ==========================
+            # Mettre à jour le stock
+            # ==========================
+
+            cur.execute("""
+                UPDATE stock
+                SET
+                    quantite = quantite + ?,
+                    prix_achat = ?
+                WHERE id = ?
+            """, (
+                quantite,
+                prix_unitaire,
+                produit_id
+            ))
+
+            conn.commit()
+            conn.close()
+
+            # Nettoyer le formulaire
+
+            self.quantite_achat.clear()
+            self.prix_unitaire_achat.clear()
+            self.total_achat.clear()
+
+            self.charger_depenses()
+
+            QMessageBox.information(
+                self,
+                "Succès",
+                f"Achat enregistré avec succès.\n\n"
+                f"Produit : {nom_produit}\n"
+                f"Quantité : {quantite:g}\n"
+                f"Total : {total:,.0f} Ar\n\n"
+                f"Le stock a été mis à jour."
+            )
+
+            return
+
+        # ==========================
+        # DEPENSE NORMALE
+        # ==========================
 
         if (
             self.libelle.text().strip() == ""
@@ -624,18 +858,23 @@ class DepensesPage(QWidget):
 
         cur.execute("""
             SELECT
-                id,
-                date_depense,
-                libelle,
-                categorie,
-                montant
+                depenses.id,
+                depenses.date_depense,
+                depenses.libelle,
+                depenses.categorie,
+                depenses.type_stock,
+                stock.nom,
+                depenses.quantite,
+                depenses.prix_unitaire,
+                depenses.montant
             FROM depenses
-            WHERE date(date_depense) = ?
-            ORDER BY date_depense DESC
+            LEFT JOIN stock
+                ON depenses.produit_id = stock.id
+            WHERE date(depenses.date_depense) = ?
+            ORDER BY depenses.date_depense DESC
         """, (
             date_precise,
         ))
-
         depenses = cur.fetchall()
 
         conn.close()
@@ -648,6 +887,9 @@ class DepensesPage(QWidget):
 
             for colonne, valeur in enumerate(depense):
 
+                if valeur is None:
+                    valeur = ""
+                    
                 self.table.setItem(
                     ligne,
                     colonne,
@@ -655,3 +897,144 @@ class DepensesPage(QWidget):
                         str(valeur)
                     )
                 )    
+
+    # ==========================
+    # Adapter le formulaire
+    # ==========================
+
+    def changer_formulaire_depense(self):
+
+        achat_stock = (
+            self.categorie.currentText()
+            == "🛒 Achat stock"
+        )
+
+        # ==========================
+        # Formulaire achat de stock
+        # ==========================
+
+        self.label_type_stock_achat.setVisible(
+            achat_stock
+        )
+
+        self.type_stock_achat.setVisible(
+            achat_stock
+        )
+
+        self.label_produit_achat.setVisible(
+            achat_stock
+        )
+
+        self.produit_achat.setVisible(
+            achat_stock
+        )
+
+        self.quantite_achat.setVisible(
+            achat_stock
+        )
+
+        self.prix_unitaire_achat.setVisible(
+            achat_stock
+        )
+
+        self.total_achat.setVisible(
+            achat_stock
+        )
+
+        # ==========================
+        # Ancien formulaire
+        # ==========================
+
+        self.libelle.setVisible(
+            not achat_stock
+        )
+
+        self.montant.setVisible(
+            not achat_stock
+        )
+
+        # La catégorie reste visible
+        # pour pouvoir changer de type
+        self.categorie.setVisible(True)
+
+        # ==========================
+        # Charger les produits
+        # ==========================
+
+        if achat_stock:
+            self.charger_produits_achat()
+
+
+    # ==========================
+    # Charger les produits du stock
+    # ==========================
+
+    def charger_produits_achat(self):
+
+        self.produit_achat.clear()
+
+        type_stock_index = (
+            self.type_stock_achat.currentIndex()
+        )
+
+        if type_stock_index == 0:
+            type_stock = "ingredient"
+
+        elif type_stock_index == 1:
+            type_stock = "boisson"
+
+        else:
+            type_stock = "biscuit"
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id, nom
+            FROM stock
+            WHERE type_stock = ?
+            ORDER BY nom
+        """, (
+            type_stock,
+        ))
+
+        produits = cur.fetchall()
+
+        conn.close()
+
+        for produit_id, nom in produits:
+
+            self.produit_achat.addItem(
+                nom,
+                produit_id
+            )
+
+
+    # ==========================
+    # Calculer le total de l'achat
+    # ==========================
+
+    def calculer_total_achat(self):
+
+        try:
+
+            quantite = float(
+                self.quantite_achat.text()
+            )
+
+            prix_unitaire = float(
+                self.prix_unitaire_achat.text()
+            )
+
+            total = (
+                quantite
+                * prix_unitaire
+            )
+
+            self.total_achat.setText(
+                f"{total:.0f}"
+            )
+
+        except ValueError:
+
+            self.total_achat.clear()
