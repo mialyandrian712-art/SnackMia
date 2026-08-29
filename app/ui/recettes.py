@@ -259,30 +259,32 @@ class RecettesPage(QWidget):
         conn.close()
 
 
+    # ==========================
+    # Charger uniquement les ingrédients
+    # ==========================
+
     def charger_stock(self):
 
         conn = get_connection()
         cur = conn.cursor()
 
+        self.stock.clear()
+
         cur.execute("""
             SELECT id, nom
             FROM stock
+            WHERE type_stock = 'ingredient'
             ORDER BY nom
         """)
 
         produits = cur.fetchall()
 
-        print("Produits trouvés :", produits)   # <-- ajoute cette ligne
-
-        self.stock.clear()
-
         for stock_id, nom in produits:
+
             self.stock.addItem(
                 nom,
                 stock_id
             )
-
-        print("Nombre d'éléments :", self.stock.count())  # <-- ajoute cette ligne
 
         conn.close()
 
