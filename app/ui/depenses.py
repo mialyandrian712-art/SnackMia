@@ -484,6 +484,7 @@ class DepensesPage(QWidget):
             ).text()
         )
 
+        # Libellé
         self.libelle.setText(
             self.table.item(
                 ligne,
@@ -491,6 +492,7 @@ class DepensesPage(QWidget):
             ).text()
         )
 
+        # Catégorie
         self.categorie.setCurrentText(
             self.table.item(
                 ligne,
@@ -498,12 +500,84 @@ class DepensesPage(QWidget):
             ).text()
         )
 
-        self.montant.setText(
-            self.table.item(
-                ligne,
-                4
-            ).text()
-        )
+        # ==========================
+        # Achat de stock
+        # ==========================
+
+        type_stock = self.table.item(
+            ligne,
+            4
+        ).text()
+
+        produit = self.table.item(
+            ligne,
+            5
+        ).text()
+
+        quantite = self.table.item(
+            ligne,
+            6
+        ).text()
+
+        prix_unitaire = self.table.item(
+            ligne,
+            7
+        ).text()
+
+        montant = self.table.item(
+            ligne,
+            8
+        ).text()
+
+        if type_stock:
+
+            # Type de stock
+            if type_stock == "ingredient":
+                self.type_stock_achat.setCurrentIndex(0)
+
+            elif type_stock == "boisson":
+                self.type_stock_achat.setCurrentIndex(1)
+
+            elif type_stock == "biscuit":
+                self.type_stock_achat.setCurrentIndex(2)
+
+            # Recharger les produits du type choisi
+            self.charger_produits_achat()
+
+            # Sélectionner le produit
+            index = self.produit_achat.findText(
+                produit
+            )
+
+            if index >= 0:
+                self.produit_achat.setCurrentIndex(
+                    index
+                )
+
+            # Quantité
+            self.quantite_achat.setText(
+                quantite
+            )
+
+            # Prix unitaire
+            self.prix_unitaire_achat.setText(
+                prix_unitaire
+            )
+
+            # Total
+            self.total_achat.setText(
+                montant
+            )
+
+        else:
+
+            # ==========================
+            # Dépense normale
+            # ==========================
+
+            self.montant.setText(
+                montant
+            )
 
     # ==========================
     # Ajouter
@@ -749,6 +823,200 @@ class DepensesPage(QWidget):
 
             return
 
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # Récupérer l'ancienne dépense
+        cur.execute("""
+            SELECT
+                type_stock,
+                produit_id,
+                quantite,
+                prix_unitaire,
+                montant
+            FROM depenses
+            WHERE id = ?
+        """, (
+            self.id_selectionne,
+        ))
+
+        ancienne = cur.fetchone()
+
+        if ancienne is None:
+
+            conn.close()
+
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Dépense introuvable."
+            )
+
+            return
+
+        ancien_type = ancienne[0]
+        ancien_produit_id = ancienne[1]
+        ancienne_quantite = ancienne[2] or 0
+
+        achat_stock = (
+            self.categorie.currentText()
+            == "🛒 Achat stock"
+        )
+
+        # ==========================
+        # MODIFICATION ACHAT STOCK
+        # ==========================
+
+        if achat_stock:
+
+            if (
+                self.produit_achat.currentData() is None
+                or self.quantite_achat.text().strip() == ""
+                or self.prix_unitaire_achat.text().strip() == ""
+            ):
+
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "Sélectionne un produit et remplis la quantité ainsi que le prix d'achat."
+                )
+
+                return
+
+            try:
+
+                nouvelle_quantite = float(
+                    self.quantite_achat.text()
+                )
+
+                nouveau_prix = float(
+                    self.prix_unitaire_achat.text()
+                )
+
+            except ValueError:
+
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "La quantité et le prix d'achat doivent être des nombres."
+                )
+
+                return
+
+            if nouvelle_quantite <= 0 or nouveau_prix < 0:
+
+                conn.close()
+
+                QMessageBox.warning(
+                    self,
+                    "Erreur",
+                    "La quantité doit être supérieure à 0 et le prix ne peut pas être négatif."
+                )
+
+                return
+
+            nouveau_produit_id = (
+                self.produit_achat.currentData()
+            )
+
+            nouveau_nom_produit = (
+                self.produit_achat.currentText()
+            )
+
+            nouveau_total = (
+                nouvelle_quantite
+                * nouveau_prix
+            )
+
+            # ==========================
+            # Restaurer l'ancien stock
+            # ==========================
+
+            if (
+                ancien_type is not None
+                and ancien_produit_id is not None
+                and ancienne_quantite
+            ):
+
+                cur.execute("""
+                    UPDATE stock
+                    SET quantite = quantite - ?
+                    WHERE id = ?
+                """, (
+                    ancienne_quantite,
+                    ancien_produit_id
+                ))
+
+            # ==========================
+            # Ajouter le nouveau stock
+            # ==========================
+
+            cur.execute("""
+                UPDATE stock
+                SET
+                    quantite = quantite + ?,
+                    prix_achat = ?
+                WHERE id = ?
+            """, (
+                nouvelle_quantite,
+                nouveau_prix,
+                nouveau_produit_id
+            ))
+
+            # ==========================
+            # Modifier la dépense
+            # ==========================
+
+            cur.execute("""
+                UPDATE depenses
+                SET
+                    libelle = ?,
+                    categorie = ?,
+                    montant = ?,
+                    type_stock = ?,
+                    produit_id = ?,
+                    quantite = ?,
+                    prix_unitaire = ?
+                WHERE id = ?
+            """, (
+                f"Achat stock - {nouveau_nom_produit}",
+                "🛒 Achat stock",
+                nouveau_total,
+                self.type_stock_achat.currentText(),
+                nouveau_produit_id,
+                nouvelle_quantite,
+                nouveau_prix,
+                self.id_selectionne
+            ))
+
+            conn.commit()
+            conn.close()
+
+            self.id_selectionne = None
+
+            self.quantite_achat.clear()
+            self.prix_unitaire_achat.clear()
+            self.total_achat.clear()
+
+            self.charger_depenses()
+
+            QMessageBox.information(
+                self,
+                "Succès",
+                "Achat de stock modifié.\n\n"
+                "Le stock a été recalculé."
+            )
+
+            return
+
+        # ==========================
+        # MODIFICATION DEPENSE NORMALE
+        # ==========================
+
         try:
 
             montant = float(
@@ -757,6 +1025,8 @@ class DepensesPage(QWidget):
 
         except ValueError:
 
+            conn.close()
+
             QMessageBox.warning(
                 self,
                 "Erreur",
@@ -764,9 +1034,6 @@ class DepensesPage(QWidget):
             )
 
             return
-
-        conn = get_connection()
-        cur = conn.cursor()
 
         cur.execute("""
             UPDATE depenses
@@ -814,6 +1081,10 @@ class DepensesPage(QWidget):
 
             return
 
+        # ==========================
+        # Confirmation
+        # ==========================
+
         reponse = QMessageBox.question(
             self,
             "Confirmation",
@@ -826,25 +1097,97 @@ class DepensesPage(QWidget):
         conn = get_connection()
         cur = conn.cursor()
 
+        # ==========================
+        # Récupérer les informations
+        # de la dépense
+        # ==========================
+
+        cur.execute("""
+            SELECT
+                type_stock,
+                produit_id,
+                quantite
+            FROM depenses
+            WHERE id = ?
+        """, (
+            self.id_selectionne,
+        ))
+
+        depense = cur.fetchone()
+
+        if depense is None:
+
+            conn.close()
+
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "Dépense introuvable."
+            )
+
+            return
+
+        type_stock = depense[0]
+        produit_id = depense[1]
+        quantite = depense[2] or 0
+
+        # ==========================
+        # Si c'est un achat de stock
+        # ==========================
+
+        if (
+            type_stock is not None
+            and produit_id is not None
+            and quantite > 0
+        ):
+
+            # Retirer la quantité du stock
+            cur.execute("""
+                UPDATE stock
+                SET quantite = quantite - ?
+                WHERE id = ?
+            """, (
+                quantite,
+                produit_id
+            ))
+
+        # ==========================
+        # Supprimer la dépense
+        # ==========================
+
         cur.execute(
-            "DELETE FROM depenses WHERE id = ?",
-            (self.id_selectionne,)
+            """
+            DELETE FROM depenses
+            WHERE id = ?
+            """,
+            (
+                self.id_selectionne,
+            )
         )
 
         conn.commit()
         conn.close()
 
+        # ==========================
+        # Nettoyer le formulaire
+        # ==========================
+
         self.id_selectionne = None
 
         self.libelle.clear()
         self.montant.clear()
+        self.quantite_achat.clear()
+        self.prix_unitaire_achat.clear()
+        self.total_achat.clear()
 
         self.charger_depenses()
 
         QMessageBox.information(
             self,
             "Succès",
-            "Dépense supprimée."
+            "Dépense supprimée.\n\n"
+            "Si c'était un achat de stock, "
+            "la quantité correspondante a été retirée du stock."
         )
 
     def rechercher_par_date(self):
