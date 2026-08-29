@@ -328,10 +328,13 @@ class RecettesPage(QWidget):
         cur = conn.cursor()
 
         # ==========================
-        # PLAT HABITUEL
+        # RECETTES
         # ==========================
 
-        if self.type_recette.currentIndex() == 0:
+        # 🍔 Plat habituel
+        # 🛍️ Vitrine
+        # 🥐 Petit déjeuner
+        if self.type_recette.currentIndex() in (0, 2, 3):
 
             cur.execute("""
                 SELECT COUNT(*)
@@ -346,6 +349,7 @@ class RecettesPage(QWidget):
             existe = cur.fetchone()[0]
 
             if existe > 0:
+
                 conn.close()
 
                 QMessageBox.warning(
@@ -353,6 +357,7 @@ class RecettesPage(QWidget):
                     "Doublon",
                     "Cet ingrédient est déjà présent dans cette recette."
                 )
+
                 return
 
             cur.execute("""
@@ -387,6 +392,7 @@ class RecettesPage(QWidget):
             existe = cur.fetchone()[0]
 
             if existe > 0:
+
                 conn.close()
 
                 QMessageBox.warning(
@@ -394,6 +400,7 @@ class RecettesPage(QWidget):
                     "Doublon",
                     "Cet ingrédient est déjà présent dans cette recette."
                 )
+
                 return
 
             cur.execute("""
@@ -479,6 +486,28 @@ class RecettesPage(QWidget):
             """, (
                 self.plat.currentData(),
             ))
+
+        # ==========================
+        # VITRINE / PETIT DÉJEUNER
+        # ==========================
+
+        elif self.type_recette.currentIndex() in (2, 3):
+
+            cur.execute("""
+                SELECT
+                    recettes.id,
+                    recettes.stock_id,
+                    stock.nom,
+                    recettes.quantite,
+                    stock.prix_achat
+                FROM recettes
+                JOIN stock
+                    ON recettes.stock_id = stock.id
+                WHERE recettes.plat_id = ?
+                ORDER BY stock.nom
+            """, (
+                self.plat.currentData(),
+            ))    
 
         recettes = cur.fetchall()
 
@@ -652,31 +681,49 @@ class RecettesPage(QWidget):
     def modifier_recette(self):
 
         if self.recette_selectionnee is None:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "Sélectionne une recette."
             )
+
             return
 
         if self.stock.currentData() is None:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "Sélectionne un ingrédient."
             )
+
             return
 
         try:
+
             quantite = float(
                 self.quantite.text().replace(",", ".")
             )
+
         except ValueError:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "La quantité doit être un nombre."
             )
+
+            return
+
+        if quantite <= 0:
+
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "La quantité doit être supérieure à 0."
+            )
+
             return
 
         conn = get_connection()
@@ -684,9 +731,11 @@ class RecettesPage(QWidget):
 
         # ==========================
         # PLAT HABITUEL
+        # VITRINE
+        # PETIT DÉJEUNER
         # ==========================
 
-        if self.type_recette.currentIndex() == 0:
+        if self.type_recette.currentIndex() in (0, 2, 3):
 
             cur.execute("""
                 UPDATE recettes
@@ -703,7 +752,7 @@ class RecettesPage(QWidget):
         # PLAT DU JOUR
         # ==========================
 
-        else:
+        elif self.type_recette.currentIndex() == 1:
 
             cur.execute("""
                 UPDATE recettes_plats_du_jour
@@ -719,6 +768,10 @@ class RecettesPage(QWidget):
         conn.commit()
         conn.close()
 
+        self.recette_selectionnee = None
+
+        self.quantite.clear()
+
         self.charger_recettes()
 
         QMessageBox.information(
@@ -727,14 +780,20 @@ class RecettesPage(QWidget):
             "Recette modifiée."
         )
 
+    # ==========================
+    # Supprimer
+    # ==========================
+
     def supprimer_recette(self):
 
         if self.recette_selectionnee is None:
+
             QMessageBox.warning(
                 self,
                 "Erreur",
                 "Sélectionne une recette."
             )
+
             return
 
         reponse = QMessageBox.question(
@@ -751,9 +810,11 @@ class RecettesPage(QWidget):
 
         # ==========================
         # PLAT HABITUEL
+        # VITRINE
+        # PETIT DÉJEUNER
         # ==========================
 
-        if self.type_recette.currentIndex() == 0:
+        if self.type_recette.currentIndex() in (0, 2, 3):
 
             cur.execute("""
                 DELETE FROM recettes
@@ -766,7 +827,7 @@ class RecettesPage(QWidget):
         # PLAT DU JOUR
         # ==========================
 
-        else:
+        elif self.type_recette.currentIndex() == 1:
 
             cur.execute("""
                 DELETE FROM recettes_plats_du_jour
